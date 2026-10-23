@@ -93,8 +93,9 @@ export const getLessons = (params) => {
   if (params?.courseId) {
     return getCourseLessons(params.courseId);
   }
-  return Promise.resolve({ data: { data: [] } });
+  return api.get('/api/lessons/all', { params });
 };
+export const getAllLessons = (params) => api.get('/api/lessons/all', { params });
 
 // Enrollment
 export const enrollCourse = (data) => api.post('/api/enroll/course', data);
@@ -117,5 +118,18 @@ export const uploadPaymentSlip = (formData) => api.post('/api/payment/evidence/u
 
 // Reject reasons
 export const getRejectReasons = (params) => api.get('/api/payment/reject-reasons/filter', { params });
+
+
+// Package Management
+export const createPackage = (formData) => api.post('/api/academic/package', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const updatePackage = (formData) => api.post('/api/academic/package/update', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const getPackageById = (id) => api.get(`/api/academic/package/${id}`);
+export const deletePackage = (id) => api.delete(`/api/academic/package/${id}`);
+export const updatePackageStatus = (id, status) => api.put(`/api/academic/package/status/${id}`, { status });
+export const getBatches = () => api.get('/api/user/batches/all');
 
 export default api;

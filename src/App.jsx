@@ -12,6 +12,8 @@ import LessonsPage from "./pages/LessonsPage";
 import EnrollPage from "./pages/EnrollPage";
 import CoursePaymentsPage from "./pages/CoursePaymentsPage";
 import PackagePaymentsPage from "./pages/PackagePaymentsPage";
+import CreatePackagePage from "./pages/CreatePackagePage";
+import PackageBuyPage from "./pages/PackageBuyPage";
 
 function App() {
   return (
@@ -43,24 +45,19 @@ function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/courses" element={<CoursesPage />} />
             <Route path="/packages" element={<PackagesPage />} />
+            <Route path="/packages/:id/buy" element={<PackageBuyPage />} />
+            <Route
+              path="/packages/create"
+              element={
+                <ProtectedRoute adminOnly>
+                  <CreatePackagePage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/lessons" element={<LessonsPage />} />
             <Route path="/enroll" element={<EnrollPage />} />
-            <Route
-              path="/payments/course"
-              element={
-                <ProtectedRoute adminOnly>
-                  <CoursePaymentsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/payments/package"
-              element={
-                <ProtectedRoute adminOnly>
-                  <PackagePaymentsPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/payments/course" element={<CoursePaymentsPage />} />
+            <Route path="/payments/package" element={<PackagePaymentsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

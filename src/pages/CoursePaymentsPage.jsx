@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { getCourseRequests, approvePayment, rejectPayment, getRejectReasons } from "../api";
 import toast from "react-hot-toast";
 
@@ -13,6 +14,7 @@ const STATUS_BADGE = {
 };
 
 export default function CoursePaymentsPage() {
+  const { isAdmin } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);

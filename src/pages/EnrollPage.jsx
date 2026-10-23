@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getCourses, getPackages, getLessons, enrollCourse, enrollPackage, enrollLesson, updateEnrollment, uploadPaymentSlip } from "../api";
 import toast from "react-hot-toast";
 
@@ -75,6 +76,7 @@ function CourseCard({ course, selected, onSelect }) {
 }
 
 export default function EnrollPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [enrollType, setEnrollType] = useState(""); // course | package | lesson
   const [items, setItems] = useState([]);
@@ -352,8 +354,18 @@ export default function EnrollPage() {
                   </div>
                   {selected && (
                     <div style={{ marginTop: "20px", textAlign: "right" }}>
-                      <button className="btn btn-primary" onClick={() => setStep(2)} id="btn-item-next">
-                        Continue with "{selected.name}" →
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => {
+                          if (enrollType === "package") {
+                            navigate(`/packages/${selected.id}/buy`);
+                          } else {
+                            setStep(2);
+                          }
+                        }}
+                        id="btn-item-next"
+                      >
+                        {enrollType === "package" ? `Choose Combination for "${selected.name}" →` : `Continue with "${selected.name}" →`}
                       </button>
                     </div>
                   )}

@@ -3,7 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 
 const StatCard = ({ label, value, color, icon, bg }) => (
   <div className="stat-card">
-    <div className="stat-icon" style={{background: bg}}>
+    <div className="stat-icon" style={{ background: bg }}>
       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke={color}>
         <path strokeLinecap="round" strokeLinejoin="round" d={icon} />
       </svg>
@@ -21,11 +21,11 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div style={{marginBottom:"24px"}}>
-        <h2 style={{fontSize:"20px",fontWeight:800}}>
+      <div style={{ marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: 800 }}>
           Good morning, {user?.firstName || "User"} 👋
         </h2>
-        <p style={{color:"var(--text-secondary)",marginTop:"4px"}}>
+        <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>
           Here is what is happening in AK ComMath today.
         </p>
       </div>
@@ -41,12 +41,12 @@ export default function DashboardPage() {
           icon="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"20px"}}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
         <div className="card">
           <div className="card-header">
             <span className="card-title">Quick Actions</span>
           </div>
-          <div className="card-body" style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {isAdmin && (
               <>
                 <button className="btn btn-primary" id="qa-enroll" onClick={() => navigate("/enroll")}>
@@ -78,17 +78,17 @@ export default function DashboardPage() {
             <span className="card-title">System Overview</span>
           </div>
           <div className="card-body">
-            <div style={{display:"flex",flexDirection:"column",gap:"14px"}}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {[
-                {label:"Combined Mathematics LMS", desc:"Advanced Level Sri Lanka"},
-                {label:"PHP REST API Backend", desc:"Running on XAMPP/Apache"},
-                {label:"React + Vite Frontend", desc:"Proxy to localhost"},
+                { label: "Combined Mathematics LMS", desc: "Advanced Level Sri Lanka" },
+                { label: "PHP REST API Backend", desc: "Running on XAMPP/Apache" },
+                { label: "React + Vite Frontend", desc: "Proxy to localhost" },
               ].map((item) => (
-                <div key={item.label} style={{display:"flex",gap:"12px",alignItems:"center"}}>
-                  <div style={{width:8,height:8,borderRadius:"50%",background:"var(--secondary)",flexShrink:0}} />
+                <div key={item.label} style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--secondary)", flexShrink: 0 }} />
                   <div>
-                    <div style={{fontWeight:600,fontSize:"13.5px"}}>{item.label}</div>
-                    <div style={{fontSize:"12px",color:"var(--text-muted)"}}>{item.desc}</div>
+                    <div style={{ fontWeight: 600, fontSize: "13.5px" }}>{item.label}</div>
+                    <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>{item.desc}</div>
                   </div>
                 </div>
               ))}

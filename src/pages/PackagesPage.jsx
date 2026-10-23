@@ -1,8 +1,12 @@
 ﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { getPackages } from "../api";
 import toast from "react-hot-toast";
 
 export default function PackagesPage() {
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ name: "", medium: "", status: "", page: 1, size: 10 });
@@ -31,6 +35,15 @@ export default function PackagesPage() {
           <h2 style={{fontWeight:800,fontSize:"18px"}}>Packages</h2>
           <p style={{color:"var(--text-secondary)",fontSize:"13px"}}>Course bundles and combination packages</p>
         </div>
+        {isAdmin && (
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate("/packages/create")}
+            id="btn-create-package"
+          >
+            + Create Package
+          </button>
+        )}
       </div>
 
       <div className="card">
@@ -76,6 +89,7 @@ export default function PackagesPage() {
                   <th>Status</th>
                   <th>Free</th>
                   <th>Featured</th>
+                    <th style={{textAlign:"right"}}>Action</th>
                 </tr>
               </thead>
               <tbody>
