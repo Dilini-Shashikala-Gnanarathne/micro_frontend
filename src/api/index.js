@@ -15,6 +15,15 @@ api.interceptors.response.use(
   }
 );
 
+const getUserRole = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem('ak_user') || '{}');
+    return user?.role || '';
+  } catch {
+    return '';
+  }
+};
+
 // Auth
 export const authLogin = (username, password) => {
   const form = new FormData();
@@ -42,15 +51,50 @@ export const verifyRegisterOtp = (txnId, otp) => {
   return api.post('/api/auth/register/verify', form);
 };
 
-// Courses
-export const getCourses = (params) => api.get('/api/courses/filter', { params });
+// Courses (Auto-selects Admin vs Student endpoint according to user role)
+export const getCourses = (params) => {
+  const role = getUserRole();
+  const endpoint = (role === 'SUPER_ADMIN' || role === 'SUB_ADMIN')
+    ? '/api/courses/filter'
+    : '/api/student/courses/filter';
+  return api.get(endpoint, { params }).catch((err) => {
+    if (err.response?.status === 403 && endpoint === '/api/courses/filter') {
+      return api.get('/api/student/courses/filter', { params });
+    }
+    throw err;
+  });
+};
+
+export const getStudentCourses = (params) => api.get('/api/student/courses/filter', { params });
+export const getAdminCourses = (params) => api.get('/api/courses/filter', { params });
 export const getCourseById = (id) => api.get(`/api/course/${id}`);
 
-// Packages
-export const getPackages = (params) => api.get('/api/academic/packages/filter', { params });
+// Packages (Auto-selects Admin vs Student endpoint according to user role)
+export const getPackages = (params) => {
+  const role = getUserRole();
+  const endpoint = (role === 'SUPER_ADMIN' || role === 'SUB_ADMIN')
+    ? '/api/packages/filter'
+    : '/api/student/packages/filter';
+  return api.get(endpoint, { params }).catch((err) => {
+    if (err.response?.status === 403 && endpoint === '/api/packages/filter') {
+      return api.get('/api/student/packages/filter', { params });
+    }
+    throw err;
+  });
+};
+
+export const getStudentPackages = (params) => api.get('/api/student/packages/filter', { params });
+export const getAdminPackages = (params) => api.get('/api/packages/filter', { params });
 
 // Lessons
-export const getLessons = (params) => api.get('/api/lessons/filter', { params });
+export const getCourseLessons = (courseId) => api.get(`/api/course/${courseId}/lessons/all`);
+export const getLessonById = (id) => api.get(`/api/lesson/${id}`);
+export const getLessons = (params) => {
+  if (params?.courseId) {
+    return getCourseLessons(params.courseId);
+  }
+  return Promise.resolve({ data: { data: [] } });
+};
 
 // Enrollment
 export const enrollCourse = (data) => api.post('/api/enroll/course', data);
@@ -64,7 +108,11 @@ export const getEnrollDetails = (id) => api.get('/api/enroll', { params: { id } 
 export const getCourseRequests = (params) => api.get('/api/enroll/requests/course', { params });
 export const getPackageRequests = (params) => api.get('/api/enroll/requests/package', { params });
 
-// Payment evidence
+// Payment approve & reject (admin)
+export const approvePayment = (paymentId) => api.put(`/api/payment/${paymentId}/approve`);
+export const rejectPayment = (paymentId, reason) => api.put(`/api/payment/${paymentId}/reject`, { reason });
+
+// Payment evidence upload
 export const uploadPaymentSlip = (formData) => api.post('/api/payment/evidence/upload', formData);
 
 // Reject reasons
