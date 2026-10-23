@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { authLogin, authLoginVerifyOtp } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -109,7 +109,7 @@ export default function LoginPage() {
                   name="password"
                   value={form.password}
                   onChange={handleChange}
-                  placeholder="••••••••••"
+                  placeholder="Password"
                   id="login-password"
                 />
                 <span className="input-suffix" onClick={() => setShowPass(v => !v)}>
@@ -123,6 +123,12 @@ export default function LoginPage() {
             <button className="btn btn-primary btn-block btn-lg" type="submit" disabled={loading} id="btn-signin">
               {loading ? <span className="spinner" /> : "Sign in Now"}
             </button>
+            <div style={{ textAlign: "center", marginTop: "18px", fontSize: "13px", color: "var(--text-secondary)" }}>
+              New student?{" "}
+              <Link to="/register" className="link-blue" style={{ fontWeight: 600 }}>
+                Register here
+              </Link>
+            </div>
           </form>
         ) : (
           <form className="login-form" onSubmit={handleVerifyOtp}>

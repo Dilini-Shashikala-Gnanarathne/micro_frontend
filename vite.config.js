@@ -9,6 +9,7 @@ export default defineConfig({
         target: 'http://localhost/amila-karunarathne',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => `/src/index.php${path}`,
       },
       '/uploads': {
         target: 'http://localhost/amila-karunarathne',

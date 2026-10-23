@@ -32,6 +32,16 @@ export const authLoginVerifyOtp = (txnId, otp) => {
 
 export const authLogout = () => api.post('/api/auth/logout');
 
+// Student Registration
+export const registerStudent = (data) => api.post('/api/auth/register', data);
+
+export const verifyRegisterOtp = (txnId, otp) => {
+  const form = new FormData();
+  form.append('txnId', txnId);
+  form.append('otp', otp);
+  return api.post('/api/auth/register/verify', form);
+};
+
 // Courses
 export const getCourses = (params) => api.get('/api/courses/filter', { params });
 export const getCourseById = (id) => api.get(`/api/course/${id}`);
