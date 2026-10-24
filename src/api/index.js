@@ -133,3 +133,7 @@ export const updatePackageStatus = (id, status) => api.put(`/api/academic/packag
 export const getBatches = () => api.get('/api/user/batches/all');
 
 export default api;
+
+// Physical Institutes & Student Profile
+export const getPhysicalInstitutes = () => api.get('/api/academic/physical-institutes/all');
+export const getStudentProfile = (userId) => api.get(/api/user/student/);
