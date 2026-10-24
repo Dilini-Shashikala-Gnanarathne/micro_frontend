@@ -137,3 +137,6 @@ export default api;
 // Physical Institutes & Student Profile
 export const getPhysicalInstitutes = () => api.get('/api/academic/physical-institutes/all');
 export const getStudentProfile = (userId) => api.get('/api/user/student/' + userId);
+export const createPhysicalInstitute = (data) => api.post('/api/academic/physical-institute', data);
+export const updatePhysicalInstitute = (id, data) => api.put('/api/academic/physical-institute/' + id, data);
+export const deletePhysicalInstitute = (id) => api.delete('/api/academic/physical-institute/' + id);
