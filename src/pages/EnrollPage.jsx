@@ -25,6 +25,19 @@ function StepIndicator({ current }) {
   );
 }
 
+
+const isTuteAvailable = (item) => {
+  if (!item) return false;
+  return Boolean(
+    item.hasTute === true ||
+    item.hasTute === 1 ||
+    item.hasTute === "1" ||
+    item.has_tute === true ||
+    item.has_tute === 1 ||
+    item.has_tute === "1"
+  );
+};
+
 function CourseCard({ course, selected, onSelect }) {
   const [imgError, setImgError] = useState(false);
   const rawUrl = course.imageUrl;
@@ -59,9 +72,9 @@ function CourseCard({ course, selected, onSelect }) {
       <div className="course-body">
         <div className="course-code">
           {course.code}
-          {Boolean(course.hasTute ?? course.has_tute) && (
+          {isTuteAvailable(course) && (
             <span className="badge badge-info" style={{ marginLeft: "6px", fontSize: "10px", padding: "2px 6px" }}>
-              📚 Tute
+              📚 Tute Available
             </span>
           )}
         </div>
@@ -425,7 +438,8 @@ export default function EnrollPage() {
               </div>
 
               {/* Tute Request Section for Single Course Enrollment */}
-              {enrollType === "course" && Boolean(selected?.hasTute ?? selected?.has_tute) && (
+              {enrollType === "course" && (
+                isTuteAvailable(selected) ? (
                 <div
                   style={{
                     border: "1.5px solid var(--border)",
@@ -547,7 +561,13 @@ export default function EnrollPage() {
                     </div>
                   )}
                 </div>
+                ) : (
+                  <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "var(--bg)", border: "1px dashed var(--border)", marginBottom: "16px", fontSize: "12px", color: "var(--text-muted)" }}>
+                    ℹ️ This course is online-only and does not offer physical tutes/study material.
+                  </div>
+                )
               )}
+
               {PAYMENT_METHODS.map((m) => (
                 <div
                   key={m.value}
