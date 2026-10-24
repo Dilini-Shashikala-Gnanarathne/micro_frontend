@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPackageById, enrollPackage, uploadPaymentSlip } from "../api";
+import { getPackageById, enrollPackage, uploadPaymentSlip, getPhysicalInstitutes } from "../api";
 import toast from "react-hot-toast";
 
 const PAYMENT_METHODS = [
@@ -33,6 +33,50 @@ export default function PackageBuyPage() {
   const [slipFile, setSlipFile] = useState(null);
   const [slipPreview, setSlipPreview] = useState(null);
   const [uploadingSlip, setUploadingSlip] = useState(false);
+
+  // Tute & Material State
+  const [institutes, setInstitutes] = useState([]);
+  const [courseTuteOptions, setCourseTuteOptions] = useState({});
+
+  useEffect(() => {
+    getPhysicalInstitutes()
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setInstitutes(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => console.error("Failed to load physical institutes:", err));
+  }, []);
+
+  const handleCourseTuteToggle = (courseId, checked) => {
+    setCourseTuteOptions((prev) => ({
+      ...prev,
+      [courseId]: {
+        needTute: checked,
+        needHomeDelivery: prev[courseId]?.needHomeDelivery ?? true,
+        deliveryInstituteId: prev[courseId]?.deliveryInstituteId ?? "",
+      },
+    }));
+  };
+
+  const handleCourseDeliveryMethod = (courseId, isHome) => {
+    setCourseTuteOptions((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...prev[courseId],
+        needHomeDelivery: isHome,
+      },
+    }));
+  };
+
+  const handleCourseInstituteChange = (courseId, instituteId) => {
+    setCourseTuteOptions((prev) => ({
+      ...prev,
+      [courseId]: {
+        ...prev[courseId],
+        deliveryInstituteId: instituteId,
+      },
+    }));
+  };
 
   useEffect(() => {
     async function loadPackage() {
@@ -77,12 +121,37 @@ export default function PackageBuyPage() {
       return;
     }
 
+    // Validate tute options if selected
+    const formattedCourses = [];
+    if (selectedCombination?.items) {
+      for (const item of selectedCombination.items) {
+        const cId = item.courseId;
+        const opt = courseTuteOptions[cId];
+        if (opt && opt.needTute) {
+          if (!opt.needHomeDelivery && !opt.deliveryInstituteId) {
+            toast.error("Please choose a pickup institute for all courses requesting institute collection.");
+            return;
+          }
+          formattedCourses.push({
+            courseId: cId,
+            needTute: true,
+            needHomeDelivery: Boolean(opt.needHomeDelivery),
+            deliveryInstituteId: opt.needHomeDelivery ? null : opt.deliveryInstituteId,
+          });
+        }
+      }
+    }
+
     setEnrolling(true);
     try {
-      const res = await enrollPackage({
+      const payload = {
         packageCombinationId: selectedComboId,
         paymentMethod: paymentMethod,
-      });
+      };
+      if (formattedCourses.length > 0) {
+        payload.courses = formattedCourses;
+      }
+      const res = await enrollPackage(payload);
 
       const data = res.data?.data || res.data;
       setEnrollData(data);
@@ -180,7 +249,7 @@ export default function PackageBuyPage() {
           onClick={() => navigate("/packages")}
           style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
         >
-          ← Back to Packages
+          â† Back to Packages
         </button>
 
         {/* Step Indicator */}
@@ -196,7 +265,7 @@ export default function PackageBuyPage() {
           >
             1. Select Combination
           </span>
-          <span>→</span>
+          <span>â†’</span>
           <span
             style={{
               padding: "4px 10px",
@@ -208,7 +277,7 @@ export default function PackageBuyPage() {
           >
             2. Payment Evidence
           </span>
-          <span>→</span>
+          <span>â†’</span>
           <span
             style={{
               padding: "4px 10px",
@@ -263,7 +332,7 @@ export default function PackageBuyPage() {
                 }}
               />
             ) : (
-              <span style={{ fontSize: "32px" }}>📦</span>
+              <span style={{ fontSize: "32px" }}>ðŸ“¦</span>
             )}
           </div>
 
@@ -280,7 +349,7 @@ export default function PackageBuyPage() {
               {pkg.description || "Course package offering curated multi-subject combinations."}
             </p>
             <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--text-muted)" }}>
-              Includes {pkg.courses?.length || 0} courses · {combinations.length} combinations available
+              Includes {pkg.courses?.length || 0} courses Â· {combinations.length} combinations available
             </div>
           </div>
         </div>
@@ -427,11 +496,161 @@ export default function PackageBuyPage() {
             </div>
           </div>
 
+          {/* Tute & Study Material Selection per Course */}
+          {(() => {
+            const comboCoursesWithTutes = selectedCombination?.items?.map((item) => {
+              const c = pkg.courses?.find((course) => course.id === item.courseId);
+              return {
+                ...item,
+                name: c?.name || item.name || "Course",
+                hasTute: Boolean(c?.hasTute ?? c?.has_tute),
+              };
+            })?.filter((c) => c.hasTute) || [];
+
+            if (comboCoursesWithTutes.length === 0) return null;
+
+            return (
+              <div className="card mb-4" id="section-package-tutes">
+                <div className="card-header">
+                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>📚</span> 2. Study Material & Tute Options (Per Course)
+                  </h2>
+                  <p style={{ fontSize: "12px", color: "var(--text-secondary)", margin: 0 }}>
+                    Select tute and delivery preferences for eligible courses in this package combination
+                  </p>
+                </div>
+                <div className="card-body">
+                  {comboCoursesWithTutes.map((c) => {
+                    const opt = courseTuteOptions[c.courseId] || { needTute: false, needHomeDelivery: true, deliveryInstituteId: "" };
+                    return (
+                      <div
+                        key={c.courseId}
+                        style={{
+                          border: `1.5px solid ${opt.needTute ? "var(--primary)" : "var(--border)"}`,
+                          borderRadius: "var(--radius-sm)",
+                          padding: "16px",
+                          marginBottom: "12px",
+                          background: opt.needTute ? "var(--primary-light)" : "var(--bg)",
+                          transition: "all .2s ease",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: "13.5px" }}>{c.name}</div>
+                            <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                              Printed study packs and tutorials available for this course.
+                            </div>
+                          </div>
+                          <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 700, fontSize: "13px" }}>
+                            <input
+                              type="checkbox"
+                              checked={opt.needTute}
+                              onChange={(e) => handleCourseTuteToggle(c.courseId, e.target.checked)}
+                              style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
+                              id={`chk-pkg-tute-${c.courseId}`}
+                            />
+                            Request Tute
+                          </label>
+                        </div>
+
+                        {opt.needTute && (
+                          <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "12px", marginTop: "12px" }}>
+                            <div style={{ fontWeight: 600, fontSize: "12px", marginBottom: "8px" }}>
+                              Delivery Method:
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                              <div
+                                onClick={() => handleCourseDeliveryMethod(c.courseId, true)}
+                                style={{
+                                  padding: "8px 12px",
+                                  borderRadius: "var(--radius-sm)",
+                                  border: `1.5px solid ${opt.needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
+                                  background: opt.needHomeDelivery ? "white" : "transparent",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  transition: "all .15s",
+                                }}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`deliv_${c.courseId}`}
+                                  checked={opt.needHomeDelivery}
+                                  onChange={() => handleCourseDeliveryMethod(c.courseId, true)}
+                                  style={{ accentColor: "var(--primary)", cursor: "pointer" }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: "12px" }}>🏠 Home Delivery</div>
+                                  <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Direct to your home</div>
+                                </div>
+                              </div>
+
+                              <div
+                                onClick={() => handleCourseDeliveryMethod(c.courseId, false)}
+                                style={{
+                                  padding: "8px 12px",
+                                  borderRadius: "var(--radius-sm)",
+                                  border: `1.5px solid ${!opt.needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
+                                  background: !opt.needHomeDelivery ? "white" : "transparent",
+                                  cursor: "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  transition: "all .15s",
+                                }}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`deliv_${c.courseId}`}
+                                  checked={!opt.needHomeDelivery}
+                                  onChange={() => handleCourseDeliveryMethod(c.courseId, false)}
+                                  style={{ accentColor: "var(--primary)", cursor: "pointer" }}
+                                />
+                                <div>
+                                  <div style={{ fontWeight: 700, fontSize: "12px" }}>🏛️ Institute Pickup</div>
+                                  <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Collect at branch</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {opt.needHomeDelivery ? (
+                              <div style={{ fontSize: "11.5px", color: "#065f46", background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "6px 10px", borderRadius: "6px" }}>
+                                ✓ Your study pack will be delivered directly to your registered student delivery address.
+                              </div>
+                            ) : (
+                              <div className="form-group" style={{ margin: 0 }}>
+                                <label className="form-label" style={{ fontSize: "11.5px", fontWeight: 700 }}>Select Pickup Institute *</label>
+                                <select
+                                  className="form-control"
+                                  value={opt.deliveryInstituteId}
+                                  onChange={(e) => handleCourseInstituteChange(c.courseId, e.target.value)}
+                                  style={{ fontSize: "12.5px" }}
+                                >
+                                  <option value="">-- Choose Institute --</option>
+                                  {institutes.map((inst) => (
+                                    <option key={inst.id} value={inst.id}>
+                                      {inst.name} {inst.address ? `(${inst.address})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Payment Method Selection */}
           <div className="card mb-4">
             <div className="card-header">
               <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>
-                2. Select Payment Method
+                3. Select Payment Method
               </h2>
             </div>
             <div className="card-body">
@@ -555,7 +774,7 @@ export default function PackageBuyPage() {
               }}
             >
               <strong style={{ color: "#166534", display: "block", marginBottom: "6px" }}>
-                🏦 Bank Deposit / Transfer Details:
+                ðŸ¦ Bank Deposit / Transfer Details:
               </strong>
               <div className="grid grid-2" style={{ gap: "6px", color: "#14532d" }}>
                 <div><strong>Bank:</strong> Commercial Bank</div>
@@ -609,7 +828,7 @@ export default function PackageBuyPage() {
                 onClick={() => setStep(1)}
                 disabled={uploadingSlip}
               >
-                ← Back
+                â† Back
               </button>
               <button
                 type="submit"

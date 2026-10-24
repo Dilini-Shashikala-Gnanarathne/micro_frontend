@@ -136,4 +136,4 @@ export default api;
 
 // Physical Institutes & Student Profile
 export const getPhysicalInstitutes = () => api.get('/api/academic/physical-institutes/all');
-export const getStudentProfile = (userId) => api.get(/api/user/student/);
+export const getStudentProfile = (userId) => api.get('/api/user/student/' + userId);
