@@ -143,3 +143,6 @@ export const deletePhysicalInstitute = (id) => api.delete('/api/academic/physica
 
 // Tute Requests
 export const getTuteRequests = (params) => api.get('/api/academic/tute-requests/filter', { params });
+export const updateTuteRequest = (id, data) => api.put('/api/academic/tute-request/' + id, data);
+export const updateTuteRequestStatus = (id, status) => api.put('/api/academic/tute-request/' + id + '/status', { status });
+export const deleteTuteRequest = (id) => api.delete('/api/academic/tute-request/' + id);
