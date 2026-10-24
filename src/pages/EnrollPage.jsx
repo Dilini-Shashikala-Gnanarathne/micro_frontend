@@ -1,6 +1,6 @@
 ﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCourses, getPackages, getLessons, enrollCourse, enrollPackage, enrollLesson, updateEnrollment, uploadPaymentSlip } from "../api";
+import { getCourses, getPackages, getLessons, enrollCourse, enrollPackage, enrollLesson, updateEnrollment, uploadPaymentSlip, getPhysicalInstitutes } from "../api";
 import toast from "react-hot-toast";
 
 const STEPS = ["Select Type", "Choose Item", "Payment Method", "Upload Slip", "Confirm"];
@@ -57,7 +57,14 @@ function CourseCard({ course, selected, onSelect }) {
         {selected && <div className="course-select-check">✓</div>}
       </div>
       <div className="course-body">
-        <div className="course-code">{course.code}</div>
+        <div className="course-code">
+          {course.code}
+          {Boolean(course.hasTute ?? course.has_tute) && (
+            <span className="badge badge-info" style={{ marginLeft: "6px", fontSize: "10px", padding: "2px 6px" }}>
+              📚 Tute
+            </span>
+          )}
+        </div>
         <div className="course-name">{course.name}</div>
         <div className="course-meta">
           <span>{course.medium}</span>
@@ -88,6 +95,19 @@ export default function EnrollPage() {
   const [enrollResult, setEnrollResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchQ, setSearchQ] = useState("");
+  const [needTute, setNeedTute] = useState(false);
+  const [needHomeDelivery, setNeedHomeDelivery] = useState(true);
+  const [deliveryInstituteId, setDeliveryInstituteId] = useState("");
+  const [institutes, setInstitutes] = useState([]);
+
+  useEffect(() => {
+    getPhysicalInstitutes()
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setInstitutes(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => console.error("Failed to load physical institutes", err));
+  }, []);
 
   const PAYMENT_METHODS = [
     {
@@ -158,7 +178,23 @@ export default function EnrollPage() {
     try {
       let res;
       if (enrollType === "course") {
-        res = await enrollCourse({ courseId: selected.id, paymentMethod });
+                const payload = { courseId: selected.id, paymentMethod };
+        const hasTute = Boolean(selected.hasTute ?? selected.has_tute);
+        if (hasTute) {
+          payload.needTute = needTute;
+          if (needTute) {
+            payload.needHomeDelivery = needHomeDelivery;
+            if (!needHomeDelivery) {
+              if (!deliveryInstituteId) {
+                toast.error("Please select a physical pickup institute for tute collection.");
+                setLoading(false);
+                return;
+              }
+              payload.deliveryInstituteId = deliveryInstituteId;
+            }
+          }
+        }
+        res = await enrollCourse(payload);
       } else if (enrollType === "package") {
         res = await enrollPackage({
           packageCombinationId: selected.packageCombinationId || selected.id,
@@ -237,6 +273,9 @@ export default function EnrollPage() {
     setSlipFile(null);
     setReferenceNo("");
     setEnrollResult(null);
+    setNeedTute(false);
+    setNeedHomeDelivery(true);
+    setDeliveryInstituteId("");
   };
 
   const filteredItems = items.filter((item) =>
@@ -384,6 +423,131 @@ export default function EnrollPage() {
               <div className="alert alert-info">
                 <span>Enrolling in: <strong>{selected?.name || `${selectedLessons.length} lesson(s)`}</strong></span>
               </div>
+
+              {/* Tute Request Section for Single Course Enrollment */}
+              {enrollType === "course" && Boolean(selected?.hasTute ?? selected?.has_tute) && (
+                <div
+                  style={{
+                    border: "1.5px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "16px",
+                    marginBottom: "16px",
+                    background: needTute ? "var(--primary-light)" : "var(--bg)",
+                    transition: "all .2s ease",
+                  }}
+                  id="section-tute-request"
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "13.5px", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span>📚</span> Study Material & Tute Delivery
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                        Printed study packs and tutorials are available for this course.
+                      </div>
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 700, fontSize: "13px" }}>
+                      <input
+                        type="checkbox"
+                        checked={needTute}
+                        onChange={(e) => setNeedTute(e.target.checked)}
+                        style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
+                        id="chk-need-tute"
+                      />
+                      Request Tute
+                    </label>
+                  </div>
+
+                  {needTute && (
+                    <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "14px", marginTop: "12px" }}>
+                      <div style={{ fontWeight: 600, fontSize: "12.5px", marginBottom: "8px" }}>
+                        Choose Delivery Destination:
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
+                        <div
+                          onClick={() => setNeedHomeDelivery(true)}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: "var(--radius-sm)",
+                            border: `1.5px solid ${needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
+                            background: needHomeDelivery ? "white" : "transparent",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            transition: "all .15s",
+                          }}
+                          id="opt-delivery-home"
+                        >
+                          <input
+                            type="radio"
+                            name="tuteDeliveryMethod"
+                            checked={needHomeDelivery}
+                            onChange={() => setNeedHomeDelivery(true)}
+                            style={{ accentColor: "var(--primary)", cursor: "pointer" }}
+                          />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: "12.5px" }}>🏠 Home Delivery</div>
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Direct to your home</div>
+                          </div>
+                        </div>
+
+                        <div
+                          onClick={() => setNeedHomeDelivery(false)}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: "var(--radius-sm)",
+                            border: `1.5px solid ${!needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
+                            background: !needHomeDelivery ? "white" : "transparent",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            transition: "all .15s",
+                          }}
+                          id="opt-delivery-institute"
+                        >
+                          <input
+                            type="radio"
+                            name="tuteDeliveryMethod"
+                            checked={!needHomeDelivery}
+                            onChange={() => setNeedHomeDelivery(false)}
+                            style={{ accentColor: "var(--primary)", cursor: "pointer" }}
+                          />
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: "12.5px" }}>🏛️ Institute Pickup</div>
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Collect at institute</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {needHomeDelivery ? (
+                        <div style={{ fontSize: "12px", color: "#065f46", background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "8px 12px", borderRadius: "6px" }}>
+                          ✓ Your study pack will be delivered directly to your registered student delivery address.
+                        </div>
+                      ) : (
+                        <div className="form-group" style={{ margin: 0 }}>
+                          <label className="form-label" style={{ fontSize: "12px", fontWeight: 700 }}>Select Pickup Institute *</label>
+                          <select
+                            className="form-control"
+                            value={deliveryInstituteId}
+                            onChange={(e) => setDeliveryInstituteId(e.target.value)}
+                            id="select-delivery-institute"
+                            style={{ fontSize: "13px" }}
+                          >
+                            <option value="">-- Choose Institute --</option>
+                            {institutes.map((inst) => (
+                              <option key={inst.id} value={inst.id}>
+                                {inst.name} {inst.address ? `(${inst.address})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
               {PAYMENT_METHODS.map((m) => (
                 <div
                   key={m.value}
