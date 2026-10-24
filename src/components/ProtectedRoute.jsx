@@ -1,18 +1,16 @@
-﻿import { useNavigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const location = useLocation();
 
   if (!user) {
-    navigate("/login", { replace: true });
-    return null;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (adminOnly && user.role !== "SUPER_ADMIN" && user.role !== "SUB_ADMIN") {
-    navigate("/dashboard", { replace: true });
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
