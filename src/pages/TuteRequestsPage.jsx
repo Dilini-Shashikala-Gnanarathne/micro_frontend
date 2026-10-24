@@ -21,16 +21,16 @@ const ORDER_STATUS_BADGE = {
 };
 
 const INITIAL_FILTERS = {
-  stAcademicId: '',
-  stMobile: '',
-  stNic: '',
-  csCode: '',
-  csName: '',
-  csType: '',
+  studentAcademicId: '',
+  studentMobile: '',
+  studentNic: '',
+  courseCode: '',
+  courseName: '',
+  courseType: '',
   orderNo: '',
   orderStatus: '',
-  trStatus: '',
-  trDeliveryType: '',
+  status: '',
+  deliveryType: '',
   page: 1,
   size: 10,
   sortBy: 'created_at',
@@ -210,42 +210,42 @@ export default function TuteRequestsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                 {/* Student Academic ID */}
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontSize: '12px' }}>St. Academic ID</label>
+                  <label className="form-label" style={{ fontSize: '12px' }}>Student Academic ID</label>
                   <input
                     type="text"
                     className="form-control"
                     placeholder="e.g. S09108"
-                    value={filters.stAcademicId}
-                    onChange={(e) => setFilters({ ...filters, stAcademicId: e.target.value })}
-                    id="filter-st-academic-id"
+                    value={filters.studentAcademicId}
+                    onChange={(e) => setFilters({ ...filters, studentAcademicId: e.target.value })}
+                    id="filter-student-academic-id"
                     style={{ height: '36px', fontSize: '13px' }}
                   />
                 </div>
 
                 {/* Student Mobile */}
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontSize: '12px' }}>St. Mobile</label>
+                  <label className="form-label" style={{ fontSize: '12px' }}>Student Mobile</label>
                   <input
                     type="text"
                     className="form-control"
                     placeholder="e.g. 077..."
-                    value={filters.stMobile}
-                    onChange={(e) => setFilters({ ...filters, stMobile: e.target.value })}
-                    id="filter-st-mobile"
+                    value={filters.studentMobile}
+                    onChange={(e) => setFilters({ ...filters, studentMobile: e.target.value })}
+                    id="filter-student-mobile"
                     style={{ height: '36px', fontSize: '13px' }}
                   />
                 </div>
 
                 {/* Student NIC */}
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontSize: '12px' }}>St. NIC</label>
+                  <label className="form-label" style={{ fontSize: '12px' }}>Student NIC</label>
                   <input
                     type="text"
                     className="form-control"
                     placeholder="e.g. 2000..."
-                    value={filters.stNic}
-                    onChange={(e) => setFilters({ ...filters, stNic: e.target.value })}
-                    id="filter-st-nic"
+                    value={filters.studentNic}
+                    onChange={(e) => setFilters({ ...filters, studentNic: e.target.value })}
+                    id="filter-student-nic"
                     style={{ height: '36px', fontSize: '13px' }}
                   />
                 </div>
@@ -257,9 +257,9 @@ export default function TuteRequestsPage() {
                     type="text"
                     className="form-control"
                     placeholder="e.g. MATH2026"
-                    value={filters.csCode}
-                    onChange={(e) => setFilters({ ...filters, csCode: e.target.value })}
-                    id="filter-cs-code"
+                    value={filters.courseCode}
+                    onChange={(e) => setFilters({ ...filters, courseCode: e.target.value })}
+                    id="filter-course-code"
                     style={{ height: '36px', fontSize: '13px' }}
                   />
                 </div>
@@ -271,9 +271,9 @@ export default function TuteRequestsPage() {
                     type="text"
                     className="form-control"
                     placeholder="Search by course..."
-                    value={filters.csName}
-                    onChange={(e) => setFilters({ ...filters, csName: e.target.value })}
-                    id="filter-cs-name"
+                    value={filters.courseName}
+                    onChange={(e) => setFilters({ ...filters, courseName: e.target.value })}
+                    id="filter-course-name"
                     style={{ height: '36px', fontSize: '13px' }}
                   />
                 </div>
@@ -283,9 +283,9 @@ export default function TuteRequestsPage() {
                   <label className="form-label" style={{ fontSize: '12px' }}>Course Type</label>
                   <select
                     className="form-control"
-                    value={filters.csType}
-                    onChange={(e) => setFilters({ ...filters, csType: e.target.value })}
-                    id="filter-cs-type"
+                    value={filters.courseType}
+                    onChange={(e) => setFilters({ ...filters, courseType: e.target.value })}
+                    id="filter-course-type"
                     style={{ height: '36px', fontSize: '13px' }}
                   >
                     <option value="">All Course Types</option>
@@ -330,17 +330,17 @@ export default function TuteRequestsPage() {
                   </select>
                 </div>
 
-                {/* TR Status */}
+                {/* Tute Request Status */}
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ fontSize: '12px' }}>Tute Status (TR Status)</label>
+                  <label className="form-label" style={{ fontSize: '12px' }}>Tute Request Status</label>
                   <select
                     className="form-control"
-                    value={filters.trStatus}
-                    onChange={(e) => setFilters({ ...filters, trStatus: e.target.value })}
-                    id="filter-tr-status"
+                    value={filters.status}
+                    onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                    id="filter-status"
                     style={{ height: '36px', fontSize: '13px' }}
                   >
-                    <option value="">All TR Statuses</option>
+                    <option value="">All Statuses</option>
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="CHECKED">CHECKED</option>
                     <option value="SENT">SENT</option>
@@ -350,14 +350,14 @@ export default function TuteRequestsPage() {
                   </select>
                 </div>
 
-                {/* TR Delivery Type */}
+                {/* Delivery Type */}
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label" style={{ fontSize: '12px' }}>Delivery Type</label>
                   <select
                     className="form-control"
-                    value={filters.trDeliveryType}
-                    onChange={(e) => setFilters({ ...filters, trDeliveryType: e.target.value })}
-                    id="filter-tr-delivery-type"
+                    value={filters.deliveryType}
+                    onChange={(e) => setFilters({ ...filters, deliveryType: e.target.value })}
+                    id="filter-delivery-type"
                     style={{ height: '36px', fontSize: '13px' }}
                   >
                     <option value="">All Delivery Types</option>
