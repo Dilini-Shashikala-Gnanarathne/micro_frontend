@@ -15,6 +15,7 @@ import PackagePaymentsPage from "./pages/PackagePaymentsPage";
 import CreatePackagePage from "./pages/CreatePackagePage";
 import PackageBuyPage from "./pages/PackageBuyPage";
 import InstitutesPage from "./pages/InstitutesPage";
+import TuteRequestsPage from "./pages/TuteRequestsPage";
 
 function App() {
   return (
@@ -57,6 +58,14 @@ function App() {
             />
             <Route path="/lessons" element={<LessonsPage />} />
             <Route path="/institutes" element={<InstitutesPage />} />
+            <Route
+              path="/tute-requests"
+              element={
+                <ProtectedRoute adminOnly>
+                  <TuteRequestsPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/enroll" element={<EnrollPage />} />
             <Route path="/payments/course" element={<CoursePaymentsPage />} />
             <Route path="/payments/package" element={<PackagePaymentsPage />} />
