@@ -1,6 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
-import { getTuteRequests } from '../api';
+import {
+  getTuteRequests,
+  updateTuteRequest,
+  updateTuteRequestStatus,
+  deleteTuteRequest,
+  getPhysicalInstitutes,
+} from '../api';
 
 const STATUS_BADGE = {
   ACTIVE: 'badge-warning',
@@ -19,6 +25,8 @@ const ORDER_STATUS_BADGE = {
   CANCELLED: 'badge-gray',
   EXPIRED: 'badge-gray',
 };
+
+const ALL_STATUSES = ['ACTIVE', 'CHECKED', 'SENT', 'DELIVERED', 'REJECTED', 'DIFFERED'];
 
 const INITIAL_FILTERS = {
   studentAcademicId: '',
@@ -40,10 +48,33 @@ const INITIAL_FILTERS = {
 export default function TuteRequestsPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState([]);
+  const [institutes, setInstitutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showFilters, setShowFilters] = useState(true);
+
+  // Edit modal state
+  const [editingItem, setEditingItem] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    deliveryType: 'INSTITUTE',
+    instituteId: '',
+    deliveryAddress: '',
+    status: 'ACTIVE',
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Delete modal state
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchInstitutes = async () => {
+    try {
+      const res = await getPhysicalInstitutes();
+      const instData = res.data?.data || res.data || [];
+      setInstitutes(Array.isArray(instData) ? instData : []);
+    } catch (_) {}
+  };
 
   const fetchRequests = async () => {
     setLoading(true);
@@ -67,6 +98,10 @@ export default function TuteRequestsPage() {
   };
 
   useEffect(() => {
+    fetchInstitutes();
+  }, []);
+
+  useEffect(() => {
     fetchRequests();
   }, [filters.page, filters.size, filters.sortBy, filters.sortDir]);
 
@@ -78,6 +113,79 @@ export default function TuteRequestsPage() {
 
   const handleResetFilters = () => {
     setFilters(INITIAL_FILTERS);
+  };
+
+  // Quick status update from row
+  const handleQuickStatusChange = async (trId, newStatus) => {
+    try {
+      await updateTuteRequestStatus(trId, newStatus);
+      toast.success(`Tute request status changed to ${newStatus}`);
+      fetchRequests();
+      if (selectedItem?.tuteRequest?.id === trId) {
+        setSelectedItem((prev) => ({
+          ...prev,
+          tuteRequest: { ...prev.tuteRequest, status: newStatus },
+        }));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update status');
+    }
+  };
+
+  // Open Edit Modal
+  const openEditModal = (item) => {
+    const tr = item.tuteRequest || {};
+    setEditingItem(item);
+    setEditFormData({
+      deliveryType: tr.deliveryType || 'INSTITUTE',
+      instituteId: item.rawInstituteId || institutes.find((i) => i.name === tr.instituteName)?.id || '',
+      deliveryAddress: tr.deliveryAddress || '',
+      status: tr.status || 'ACTIVE',
+    });
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    if (editFormData.deliveryType === 'INSTITUTE' && !editFormData.instituteId) {
+      toast.error('Please select a delivery institute');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await updateTuteRequest(editingItem.tuteRequest.id, {
+        deliveryType: editFormData.deliveryType,
+        instituteId: editFormData.deliveryType === 'INSTITUTE' ? editFormData.instituteId : null,
+        deliveryAddress: editFormData.deliveryType === 'HOME' ? editFormData.deliveryAddress : null,
+        status: editFormData.status,
+      });
+
+      toast.success('Tute request updated successfully');
+      setEditingItem(null);
+      fetchRequests();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update tute request');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Delete Request
+  const handleDeleteConfirm = async () => {
+    if (!deletingItem) return;
+    setIsDeleting(true);
+    try {
+      await deleteTuteRequest(deletingItem.tuteRequest.id);
+      toast.success('Tute request deleted successfully');
+      setDeletingItem(null);
+      fetchRequests();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete tute request');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const totalPages = Math.ceil(totalCount / filters.size) || 1;
@@ -96,7 +204,7 @@ export default function TuteRequestsPage() {
   }, [data]);
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', paddingBottom: '40px' }}>
+    <div style={{ maxWidth: '1300px', margin: '0 auto', paddingBottom: '40px' }}>
       {/* Header section */}
       <div
         style={{
@@ -113,7 +221,7 @@ export default function TuteRequestsPage() {
             Tute Requests
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13.5px', margin: 0 }}>
-            Track, filter, and process student tute orders, home deliveries, and institute pickups
+            Track, update, filter, and process student tute orders, home deliveries, and institute pickups
           </p>
         </div>
 
@@ -341,12 +449,11 @@ export default function TuteRequestsPage() {
                     style={{ height: '36px', fontSize: '13px' }}
                   >
                     <option value="">All Statuses</option>
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="CHECKED">CHECKED</option>
-                    <option value="SENT">SENT</option>
-                    <option value="DELIVERED">DELIVERED</option>
-                    <option value="REJECTED">REJECTED</option>
-                    <option value="DIFFERED">DIFFERED</option>
+                    {ALL_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -446,12 +553,12 @@ export default function TuteRequestsPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  <th style={{ width: '14%', padding: '12px 14px' }}>Tute Status</th>
-                  <th style={{ width: '22%', padding: '12px 14px' }}>Student Details</th>
-                  <th style={{ width: '22%', padding: '12px 14px' }}>Course</th>
+                  <th style={{ width: '16%', padding: '12px 14px' }}>Tute Status</th>
+                  <th style={{ width: '20%', padding: '12px 14px' }}>Student Details</th>
+                  <th style={{ width: '20%', padding: '12px 14px' }}>Course</th>
                   <th style={{ width: '18%', padding: '12px 14px' }}>Delivery Details</th>
-                  <th style={{ width: '16%', padding: '12px 14px' }}>Order & Payment</th>
-                  <th style={{ width: '8%', padding: '12px 14px', textAlign: 'right' }}>Action</th>
+                  <th style={{ width: '14%', padding: '12px 14px' }}>Order & Payment</th>
+                  <th style={{ width: '12%', padding: '12px 14px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -465,14 +572,34 @@ export default function TuteRequestsPage() {
                   const trBadgeClass = STATUS_BADGE[tr.status] || 'badge-gray';
                   const ordBadgeClass = ORDER_STATUS_BADGE[ord.status] || 'badge-gray';
                   const isHome = tr.deliveryType === 'HOME';
+                  const canDelete = tr.status === 'DELIVERED' || tr.status === 'REJECTED';
 
                   return (
                     <tr key={tr.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                       {/* Tute Status */}
                       <td style={{ padding: '14px', verticalAlign: 'top' }}>
-                        <span className={'badge ' + trBadgeClass} style={{ marginBottom: '6px', display: 'inline-block' }}>
-                          {tr.status || 'UNKNOWN'}
-                        </span>
+                        <div style={{ marginBottom: '6px' }}>
+                          <select
+                            className={'badge ' + trBadgeClass}
+                            style={{
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontWeight: 700,
+                              fontSize: '11px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                            }}
+                            value={tr.status || 'ACTIVE'}
+                            onChange={(e) => handleQuickStatusChange(tr.id, e.target.value)}
+                            title="Click to quickly update status"
+                          >
+                            {ALL_STATUSES.map((s) => (
+                              <option key={s} value={s} style={{ background: '#1e293b', color: '#fff' }}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {tr.createdAt ? tr.createdAt.slice(0, 16) : ''}
                         </div>
@@ -572,17 +699,54 @@ export default function TuteRequestsPage() {
                         </div>
                       </td>
 
-                      {/* Action */}
+                      {/* Actions */}
                       <td style={{ padding: '14px', verticalAlign: 'top', textAlign: 'right' }}>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '4px 10px', fontSize: '12px' }}
-                          onClick={() => setSelectedItem(item)}
-                          id={'btn-view-details-' + tr.id}
-                        >
-                          Details
-                        </button>
+                        <div style={{ display: 'inline-flex', gap: '5px' }}>
+                          {/* Details */}
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '3px 8px', fontSize: '11.5px' }}
+                            onClick={() => setSelectedItem(item)}
+                            title="View Full Details"
+                          >
+                            Details
+                          </button>
+
+                          {/* Edit */}
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            style={{ padding: '3px 8px', fontSize: '11.5px' }}
+                            onClick={() => openEditModal(item)}
+                            title="Edit Delivery & Status"
+                          >
+                            Edit
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            style={{
+                              padding: '3px 7px',
+                              fontSize: '11.5px',
+                              opacity: canDelete ? 1 : 0.35,
+                              cursor: canDelete ? 'pointer' : 'not-allowed',
+                            }}
+                            disabled={!canDelete}
+                            onClick={() => canDelete && setDeletingItem(item)}
+                            title={
+                              canDelete
+                                ? 'Delete Tute Request'
+                                : 'Can only delete requests in DELIVERED or REJECTED status'
+                            }
+                          >
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -643,6 +807,185 @@ export default function TuteRequestsPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Tute Request Modal */}
+      {editingItem && (
+        <div className="modal-overlay" onClick={() => !isUpdating && setEditingItem(null)}>
+          <div
+            className="modal"
+            style={{ maxWidth: '560px', width: '100%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ fontSize: '16px', fontWeight: 700 }}>
+                Update Tute Request
+              </h3>
+              <button className="modal-close" onClick={() => setEditingItem(null)} disabled={isUpdating}>
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Student / Course info banner */}
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '6px', fontSize: '12.5px' }}>
+                  <div><strong>Student:</strong> {editingItem.student?.fname} {editingItem.student?.lname} ({editingItem.student?.academicId})</div>
+                  <div style={{ marginTop: '2px' }}><strong>Course:</strong> {editingItem.course?.name}</div>
+                </div>
+
+                {/* Delivery Type Selection */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Delivery Type</label>
+                  <div style={{ display: 'flex', gap: '18px', marginTop: '6px' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="radio"
+                        name="editDeliveryType"
+                        checked={editFormData.deliveryType === 'INSTITUTE'}
+                        onChange={() => setEditFormData({ ...editFormData, deliveryType: 'INSTITUTE' })}
+                      />
+                      🏛️ Institute Pickup
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                      <input
+                        type="radio"
+                        name="editDeliveryType"
+                        checked={editFormData.deliveryType === 'HOME'}
+                        onChange={() => setEditFormData({ ...editFormData, deliveryType: 'HOME' })}
+                      />
+                      🏠 Home Delivery
+                    </label>
+                  </div>
+                </div>
+
+                {/* Institute Dropdown if INSTITUTE */}
+                {editFormData.deliveryType === 'INSTITUTE' ? (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Select Delivery Institute *</label>
+                    <select
+                      className="form-control"
+                      value={editFormData.instituteId}
+                      onChange={(e) => setEditFormData({ ...editFormData, instituteId: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Choose Physical Institute --</option>
+                      {institutes.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name} ({inst.address})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  /* Delivery Address Textarea if HOME */
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Student Delivery Address</label>
+                    <textarea
+                      rows={3}
+                      className="form-control"
+                      placeholder="Enter student home delivery address..."
+                      value={editFormData.deliveryAddress}
+                      onChange={(e) => setEditFormData({ ...editFormData, deliveryAddress: e.target.value })}
+                      style={{ resize: 'vertical' }}
+                    />
+                    <div className="form-hint">
+                      This will update the delivery address for home shipment.
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Selection */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Tute Request Status</label>
+                  <select
+                    className="form-control"
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                  >
+                    {ALL_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="form-hint">
+                    Setting status to REJECTED automatically marks order fulfillment as FAILED. Updating from REJECTED marks it as COMPLETED.
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditingItem(null)}
+                  disabled={isUpdating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isUpdating}
+                >
+                  {isUpdating ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingItem && (
+        <div className="modal-overlay" onClick={() => !isDeleting && setDeletingItem(null)}>
+          <div
+            className="modal"
+            style={{ maxWidth: '440px', width: '100%' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ fontSize: '16px', fontWeight: 700, color: '#ef4444' }}>
+                Confirm Soft Deletion
+              </h3>
+              <button className="modal-close" onClick={() => setDeletingItem(null)} disabled={isDeleting}>
+                ✕
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '0 0 10px 0' }}>
+                Are you sure you want to delete this tute request?
+              </p>
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 12px', borderRadius: '6px', fontSize: '12.5px' }}>
+                <div><strong>Student:</strong> {deletingItem.student?.fname} {deletingItem.student?.lname}</div>
+                <div><strong>Course:</strong> {deletingItem.course?.name}</div>
+                <div><strong>Current Status:</strong> <span className="badge badge-success">{deletingItem.tuteRequest?.status}</span></div>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '12px 0 0 0' }}>
+                This record will be marked as deleted and excluded from active fulfillment.
+              </p>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeletingItem(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Comprehensive Details Modal */}
       {selectedItem && (
