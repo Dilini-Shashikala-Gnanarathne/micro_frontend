@@ -140,3 +140,6 @@ export const getStudentProfile = (userId) => api.get('/api/user/student/' + user
 export const createPhysicalInstitute = (data) => api.post('/api/academic/physical-institute', data);
 export const updatePhysicalInstitute = (id, data) => api.put('/api/academic/physical-institute/' + id, data);
 export const deletePhysicalInstitute = (id) => api.delete('/api/academic/physical-institute/' + id);
+
+// Tute Requests
+export const getTuteRequests = (params) => api.get('/api/academic/tute-requests/filter', { params });
