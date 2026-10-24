@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import {
   getTuteRequests,
+  getTuteRequestsForPrint,
   updateTuteRequest,
   updateTuteRequestStatus,
   deleteTuteRequest,
@@ -63,6 +64,26 @@ export default function TuteRequestsPage() {
     status: 'ACTIVE',
   });
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Print modal state
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printData, setPrintData] = useState([]);
+  const [printLoading, setPrintLoading] = useState(false);
+  const [printViewMode, setPrintViewMode] = useState('table'); // 'table' | 'labels'
+
+  const handleOpenPrintModal = async () => {
+    setShowPrintModal(true);
+    setPrintLoading(true);
+    try {
+      const res = await getTuteRequestsForPrint();
+      const items = res.data?.data || res.data || [];
+      setPrintData(Array.isArray(items) ? items : []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to fetch print requests');
+    } finally {
+      setPrintLoading(false);
+    }
+  };
 
   // Delete modal state
   const [deletingItem, setDeletingItem] = useState(null);
@@ -191,6 +212,10 @@ export default function TuteRequestsPage() {
   const totalPages = Math.ceil(totalCount / filters.size) || 1;
 
   // Stats calculation
+  const checkedCount = useMemo(() => {
+    return data.filter((item) => item.tuteRequest?.status === 'CHECKED').length;
+  }, [data]);
+
   const activeCount = useMemo(() => {
     return data.filter((item) => item.tuteRequest?.status === 'ACTIVE').length;
   }, [data]);
@@ -225,7 +250,19 @@ export default function TuteRequestsPage() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={handleOpenPrintModal}
+            id="btn-open-print-modal"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print Checked
+          </button>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -1198,6 +1235,277 @@ export default function TuteRequestsPage() {
           </div>
         </div>
       )}
+
+      {/* Print Checked Tute Requests Modal */}
+      {showPrintModal && (
+        <div className="modal-overlay" onClick={() => setShowPrintModal(false)}>
+          <div
+            className="modal"
+            style={{ maxWidth: '1000px', width: '95%', maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="modal-header no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#3b82f6'
+                }}>
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ fontSize: '17px', fontWeight: 700, margin: 0 }}>
+                    Print Tute Requests
+                  </h3>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    Filter: <strong>status = 'CHECKED'</strong> ? {printData.length} records ready to print
+                  </div>
+                </div>
+              </div>
+
+              {/* View mode toggle & Print button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'inline-flex', background: 'var(--bg-tertiary, rgba(255,255,255,0.06))', padding: '3px', borderRadius: '6px' }}>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${printViewMode === 'table' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ fontSize: '12px', padding: '4px 10px', height: 'auto', border: 'none' }}
+                    onClick={() => setPrintViewMode('table')}
+                  >
+                    Table Sheet
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${printViewMode === 'labels' ? 'btn-primary' : 'btn-outline'}`}
+                    style={{ fontSize: '12px', padding: '4px 10px', height: 'auto', border: 'none' }}
+                    onClick={() => setPrintViewMode('labels')}
+                  >
+                    Shipping Labels
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={() => window.print()}
+                  disabled={printLoading || printData.length === 0}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  id="btn-trigger-print"
+                >
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print Document
+                </button>
+
+                <button className="modal-close" onClick={() => setShowPrintModal(false)}>
+                  o 
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Scrollable Body */}
+            <div className="modal-body" style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+              {printLoading ? (
+                <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
+                  <div className="spinner" style={{ margin: '0 auto 12px auto' }}></div>
+                  <p>Loading checked tute requests...</p>
+                </div>
+              ) : printData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '50px 20px' }}>
+                  <div style={{
+                    width: '50px',
+                    height: '50px',
+                    borderRadius: '50%',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 14px auto',
+                    color: 'var(--text-muted)'
+                  }}>
+                    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <h4 style={{ margin: '0 0 6px 0', fontWeight: 600 }}>No Checked Tute Requests</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+                    There are currently no tute requests with status <code>CHECKED</code> ready for printing.
+                  </p>
+                </div>
+              ) : (
+                /* Printable Content Container */
+                <div id="printable-tute-area" style={{ background: '#ffffff', color: '#111827', padding: '24px', borderRadius: '8px' }}>
+                  {/* Print Document Header */}
+                  <div style={{ borderBottom: '2px solid #111827', paddingBottom: '14px', marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div>
+                      <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Tute Distribution & Dispatch Sheet
+                      </h2>
+                      <div style={{ fontSize: '12px', color: '#4b5563' }}>
+                        Batch Status: <strong>CHECKED</strong> ? Generated: {new Date().toLocaleString()}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, background: '#f3f4f6', color: '#111827', padding: '4px 10px', borderRadius: '4px', border: '1px solid #d1d5db' }}>
+                        Total Checked: {printData.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mode 1: Table View */}
+                  {printViewMode === 'table' ? (
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', color: '#111827' }}>
+                      <thead>
+                        <tr style={{ background: '#f3f4f6', borderBottom: '2px solid #9ca3af' }}>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', width: '36px', border: '1px solid #d1d5db' }}>#</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', width: '110px', border: '1px solid #d1d5db' }}>Academic ID</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', width: '180px', border: '1px solid #d1d5db' }}>Student Name</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', width: '110px', border: '1px solid #d1d5db' }}>Mobile</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', width: '110px', border: '1px solid #d1d5db' }}>Delivery Type</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', border: '1px solid #d1d5db' }}>Delivery Address</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', width: '180px', border: '1px solid #d1d5db' }}>Institute Name</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', width: '90px', border: '1px solid #d1d5db' }}>Check / Sign</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {printData.map((row, idx) => (
+                          <tr key={row.id || idx} style={{ borderBottom: '1px solid #e5e7eb', background: idx % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', fontWeight: 700, fontFamily: 'monospace', color: '#1e40af' }}>
+                              {row.academicId || '-'}
+                            </td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', fontWeight: 600 }}>
+                              {row.fname} {row.lname}
+                            </td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db' }}>
+                              {row.mobile || '-'}
+                            </td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', fontWeight: 600 }}>
+                              {row.deliveryType || 'HOME'}
+                            </td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', lineHeight: 1.35 }}>
+                              {row.deliveryAddress || '-'}
+                            </td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', fontWeight: 500 }}>
+                              {row.instituteName || (row.deliveryType === 'HOME' ? 'Home Delivery' : '-')}
+                            </td>
+                            <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', textAlign: 'center' }}>
+                              <div style={{ width: '16px', height: '16px', border: '1.5px solid #6b7280', margin: '0 auto', borderRadius: '3px' }}></div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    /* Mode 2: Shipping Labels Grid */
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
+                      {printData.map((row, idx) => (
+                        <div
+                          key={row.id || idx}
+                          style={{
+                            border: '1.5px solid #374151',
+                            borderRadius: '6px',
+                            padding: '14px',
+                            background: '#ffffff',
+                            breakInside: 'avoid',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <div>
+                            {/* Label Header */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px dashed #9ca3af', paddingBottom: '6px', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#1e40af' }}>
+                                Tute Delivery Label #{idx + 1}
+                              </span>
+                              <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 6px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '3px' }}>
+                                {row.deliveryType || 'HOME'}
+                              </span>
+                            </div>
+
+                            {/* Recipient Details */}
+                            <div style={{ marginBottom: '8px' }}>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#111827' }}>
+                                {row.fname} {row.lname}
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: '#2563eb' }}>
+                                Academic ID: {row.academicId}
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginTop: '2px' }}>
+                                Mobile: {row.mobile || 'N/A'}
+                              </div>
+                            </div>
+
+                            {/* Address / Institute */}
+                            <div style={{ fontSize: '12px', background: '#f9fafb', padding: '8px 10px', borderRadius: '4px', border: '1px solid #e5e7eb', marginBottom: '8px' }}>
+                              {row.deliveryAddress && (
+                                <div style={{ marginBottom: '4px' }}>
+                                  <strong style={{ color: '#4b5563', fontSize: '11px', display: 'block' }}>Delivery Address:</strong>
+                                  <span style={{ color: '#111827', fontWeight: 500 }}>{row.deliveryAddress}</span>
+                                </div>
+                              )}
+                              {row.instituteName && (
+                                <div>
+                                  <strong style={{ color: '#4b5563', fontSize: '11px', display: 'block' }}>Pickup Institute:</strong>
+                                  <span style={{ color: '#111827', fontWeight: 600 }}>{row.instituteName}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Course note if available */}
+                          {(row.courseCode || row.courseName) && (
+                            <div style={{ fontSize: '11px', color: '#6b7280', borderTop: '1px dashed #d1d5db', paddingTop: '6px', marginTop: '4px' }}>
+                              Course: <strong>{row.courseCode}</strong> {row.courseName ? `(${row.courseName})` : ''}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Document Footer */}
+                  <div style={{ marginTop: '24px', paddingTop: '12px', borderTop: '1px solid #9ca3af', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280' }}>
+                    <div>System Generated ? Amila Karunarathne LMS</div>
+                    <div>Page Printed from Tute Requests Portal</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="modal-footer no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                Tip: In the print dialog, select "Background graphics" to include borders and highlights.
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPrintModal(false)}>
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => window.print()}
+                  disabled={printLoading || printData.length === 0}
+                >
+                  Print
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
