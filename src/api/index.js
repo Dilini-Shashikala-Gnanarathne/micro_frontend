@@ -146,3 +146,4 @@ export const getTuteRequests = (params) => api.get('/api/academic/tute-requests/
 export const updateTuteRequest = (id, data) => api.put('/api/academic/tute-request/' + id, data);
 export const updateTuteRequestStatus = (id, status) => api.put('/api/academic/tute-request/' + id + '/status', { status });
 export const deleteTuteRequest = (id) => api.delete('/api/academic/tute-request/' + id);
+export const getTuteRequestsForPrint = (params) => api.get('/api/academic/tute-requests/print', { params });
