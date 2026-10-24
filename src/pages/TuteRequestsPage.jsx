@@ -70,6 +70,161 @@ export default function TuteRequestsPage() {
   const [printData, setPrintData] = useState([]);
   const [printLoading, setPrintLoading] = useState(false);
   const [printViewMode, setPrintViewMode] = useState('table'); // 'table' | 'labels'
+  const [printDeliveryFilter, setPrintDeliveryFilter] = useState('ALL');
+  const [printSearchQuery, setPrintSearchQuery] = useState('');
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  const filteredPrintRecords = useMemo(() => {
+    return printData
+      .filter((r) => printDeliveryFilter === 'ALL' || r.deliveryType === printDeliveryFilter)
+      .filter((r) => {
+        if (!printSearchQuery.trim()) return true;
+        const q = printSearchQuery.toLowerCase();
+        const combined = `${r.fname} ${r.lname} ${r.academicId} ${r.mobile} ${r.deliveryAddress || ''} ${r.instituteName || ''}`.toLowerCase();
+        return combined.includes(q);
+      });
+  }, [printData, printDeliveryFilter, printSearchQuery]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === data.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(data.map((item) => item.tuteRequest?.id).filter(Boolean));
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus) => {
+    if (selectedIds.length === 0) return;
+    if (newStatus === 'REJECTED' && !window.confirm(`Are you sure you want to mark ${selectedIds.length} requests as REJECTED? Order fulfillment will be set to FAILED.`)) {
+      return;
+    }
+
+    setIsBulkUpdating(true);
+    let count = 0;
+    try {
+      await Promise.all(
+        selectedIds.map(async (id) => {
+          try {
+            await updateTuteRequestStatus(id, newStatus);
+            count++;
+          } catch (_) {}
+        })
+      );
+      toast.success(`Updated ${count} of ${selectedIds.length} requests to ${newStatus}`);
+      setSelectedIds([]);
+      fetchRequests();
+    } catch (err) {
+      toast.error('Bulk update encountered errors');
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    if (!data || data.length === 0) {
+      toast.error('No tute requests to export');
+      return;
+    }
+
+    const headers = [
+      'Tute Request ID',
+      'Status',
+      'Delivery Type',
+      'Institute Name',
+      'Delivery Address',
+      'Academic ID',
+      'First Name',
+      'Last Name',
+      'Mobile',
+      'NIC',
+      'Course Code',
+      'Course Name',
+      'Course Type',
+      'Order No',
+      'Order Status',
+      'Final Amount (LKR)',
+      'Payment Method',
+      'Created Date',
+    ];
+
+    const escapeCsv = (val) => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = data.map((item) => {
+      const tr = item.tuteRequest || {};
+      const st = item.student || {};
+      const cs = item.course || {};
+      const ord = item.order || {};
+      const pay = item.payment || {};
+
+      return [
+        escapeCsv(tr.id),
+        escapeCsv(tr.status),
+        escapeCsv(tr.deliveryType),
+        escapeCsv(tr.instituteName || ''),
+        escapeCsv(tr.deliveryAddress || ''),
+        escapeCsv(st.academicId || ''),
+        escapeCsv(st.fname || ''),
+        escapeCsv(st.lname || ''),
+        escapeCsv(st.mobile || ''),
+        escapeCsv(st.nic || ''),
+        escapeCsv(cs.code || ''),
+        escapeCsv(cs.name || ''),
+        escapeCsv(cs.courseType || ''),
+        escapeCsv(ord.orderNo || ''),
+        escapeCsv(ord.status || ''),
+        escapeCsv(ord.finalAmount || ''),
+        escapeCsv(pay.paymentMethod || ''),
+        escapeCsv(tr.createdAt || ''),
+      ].join(',');
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,﻿' + [headers.join(','), ...rows].join('\r\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `tute_requests_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Tute requests exported to CSV');
+  };
+
+  const handlePrintSingle = (item) => {
+    const tr = item.tuteRequest || {};
+    const st = item.student || {};
+    const cs = item.course || {};
+    setPrintData([
+      {
+        id: tr.id,
+        academicId: st.academicId || '',
+        fname: st.fname || '',
+        lname: st.lname || '',
+        mobile: st.mobile || '',
+        deliveryAddress: tr.deliveryAddress || '',
+        instituteName: tr.instituteName || '',
+        deliveryType: tr.deliveryType || 'HOME',
+        courseCode: cs.code || '',
+        courseName: cs.name || '',
+      },
+    ]);
+    setPrintDeliveryFilter('ALL');
+    setPrintSearchQuery('');
+    setPrintViewMode('labels');
+    setShowPrintModal(true);
+  };
 
   const handleOpenPrintModal = async () => {
     setShowPrintModal(true);
@@ -530,6 +685,78 @@ export default function TuteRequestsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* Bulk Action Toolbar */}
+      {selectedIds.length > 0 && (
+        <div
+          className="card"
+          style={{
+            background: 'rgba(59, 130, 246, 0.08)',
+            border: '1.5px solid rgba(59, 130, 246, 0.4)',
+            marginBottom: '20px',
+            padding: '12px 18px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span className="badge badge-primary" style={{ fontSize: '13px', padding: '4px 10px', fontWeight: 700 }}>
+              {selectedIds.length} Selected
+            </span>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              Bulk status actions for selected tute requests:
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => handleBulkStatusChange('CHECKED')}
+              disabled={isBulkUpdating}
+              title="Mark as CHECKED for printing"
+            >
+              Mark CHECKED
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => handleBulkStatusChange('SENT')}
+              disabled={isBulkUpdating}
+            >
+              Mark SENT
+            </button>
+            <button
+              type="button"
+              className="btn btn-success btn-sm"
+              onClick={() => handleBulkStatusChange('DELIVERED')}
+              disabled={isBulkUpdating}
+            >
+              Mark DELIVERED
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              onClick={() => handleBulkStatusChange('REJECTED')}
+              disabled={isBulkUpdating}
+            >
+              Mark REJECTED
+            </button>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setSelectedIds([])}
+              disabled={isBulkUpdating}
+            >
+              Deselect All
+            </button>
           </div>
         </div>
       )}
@@ -1356,7 +1583,7 @@ export default function TuteRequestsPage() {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <span style={{ fontSize: '13px', fontWeight: 700, background: '#f3f4f6', color: '#111827', padding: '4px 10px', borderRadius: '4px', border: '1px solid #d1d5db' }}>
-                        Total Checked: {printData.length}
+                        Total Printable: {filteredPrintRecords.length}
                       </span>
                     </div>
                   </div>
@@ -1377,7 +1604,7 @@ export default function TuteRequestsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {printData.map((row, idx) => (
+                        {filteredPrintRecords.map((row, idx) => (
                           <tr key={row.id || idx} style={{ borderBottom: '1px solid #e5e7eb', background: idx % 2 === 0 ? '#ffffff' : '#f9fafb' }}>
                             <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', textAlign: 'center', fontWeight: 600 }}>{idx + 1}</td>
                             <td style={{ padding: '8px 10px', border: '1px solid #d1d5db', fontWeight: 700, fontFamily: 'monospace', color: '#1e40af' }}>
@@ -1408,7 +1635,7 @@ export default function TuteRequestsPage() {
                   ) : (
                     /* Mode 2: Shipping Labels Grid */
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-                      {printData.map((row, idx) => (
+                      {filteredPrintRecords.map((row, idx) => (
                         <div
                           key={row.id || idx}
                           style={{
