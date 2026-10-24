@@ -58,6 +58,9 @@ export default function DashboardPage() {
                 <button className="btn btn-secondary" id="qa-payments" onClick={() => navigate("/payments/course")}>
                   Review Payment Requests
                 </button>
+                <button className="btn btn-secondary" id="qa-tute-requests" onClick={() => navigate("/tute-requests")}>
+                  Manage Tute Requests & Deliveries
+                </button>
               </>
             )}
             {!isAdmin && (
