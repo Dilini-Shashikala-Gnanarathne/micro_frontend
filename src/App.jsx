@@ -14,6 +14,7 @@ import CoursePaymentsPage from "./pages/CoursePaymentsPage";
 import PackagePaymentsPage from "./pages/PackagePaymentsPage";
 import CreatePackagePage from "./pages/CreatePackagePage";
 import PackageBuyPage from "./pages/PackageBuyPage";
+import InstitutesPage from "./pages/InstitutesPage";
 
 function App() {
   return (
@@ -55,6 +56,7 @@ function App() {
               }
             />
             <Route path="/lessons" element={<LessonsPage />} />
+            <Route path="/institutes" element={<InstitutesPage />} />
             <Route path="/enroll" element={<EnrollPage />} />
             <Route path="/payments/course" element={<CoursePaymentsPage />} />
             <Route path="/payments/package" element={<PackagePaymentsPage />} />
