@@ -93,7 +93,7 @@ export default function LessonPaymentsPage() {
   };
 
   const handleApprove = async () => {
-    const paymentId = selectedReq?.payment?.id;
+    const paymentId = selectedReq?.paymentId || selectedReq?.payment?.id;
     if (!paymentId) {
       toast.error("No valid payment ID found for this request.");
       return;
@@ -114,7 +114,7 @@ export default function LessonPaymentsPage() {
   };
 
   const handleReject = async () => {
-    const paymentId = selectedReq?.payment?.id;
+    const paymentId = selectedReq?.paymentId || selectedReq?.payment?.id;
     if (!paymentId) {
       toast.error("No valid payment ID found for this request.");
       return;
@@ -146,7 +146,7 @@ export default function LessonPaymentsPage() {
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
     if (url.startsWith("/uploads/")) return url;
     if (url.startsWith("uploads/")) return "/" + url;
-    return `/uploads/${url.replace(/^\/+/, "")}`;
+    return "/uploads/" + url.replace(/^\/+/, "");
   };
 
   return (
@@ -239,104 +239,107 @@ export default function LessonPaymentsPage() {
               </thead>
               <tbody>
                 {requests.map((req, idx) => {
-                  const studentName = `${req.student?.firstName || ""} ${req.student?.lastName || ""}`.trim() || "Student";
-                  const lessonName = req.lesson?.name || "Lesson";
-                  const courseName = req.lesson?.course?.name || "-";
-                  const payment = req.payment;
-                  const order = req.order;
-                  const evidence = payment?.evidence;
-                  const slipUrl = evidence?.fileUrl;
-                  const isPending = payment?.status === "WAITING_APPROVAL" || payment?.status === "PENDING" || req.lesson?.enrollment?.status === "PENDING";
-                  const requestCount = req.student?.requestCount ?? 0;
+                  const studentName = req.studentName || `${req.student?.firstName || ""} ${req.student?.lastName || ""}`.trim() || "Student";
+                  const academicId = req.academicId || req.student?.academicId;
+                  const mobile = req.mobile || req.student?.mobile;
+                  const studentBatch = req.studentBatch || req.student?.batch;
+                  const studentMedium = req.studentMedium || req.student?.medium;
+
+                  const lessonName = req.lessonName || req.lesson?.name || "Lesson";
+                  const courseName = req.courseName || req.lesson?.course?.name || "-";
+                  const courseCode = req.courseCode || req.lesson?.course?.code || "";
+                  const lessonDate = req.lessonDate || req.lesson?.date;
+
+                  const paymentAmount = req.paymentAmount ?? req.payment?.amount ?? req.order?.totalAmount ?? 0;
+                  const orderNo = req.orderNo || req.order?.ordernumber || req.order?.order_no || "-";
+                  const paymentMethod = req.paymentMethod || req.payment?.paymentMethod || "-";
+                  const referenceNo = req.referenceNo || req.payment?.evidence?.referenceNo || req.payment?.referenceNo || "-";
+                  const slipUrl = req.slipUrl || req.payment?.evidence?.fileUrl;
+                  const paymentStatus = req.paymentStatus || req.payment?.status || req.status || "PENDING";
+                  const isPending = paymentStatus === "WAITING_APPROVAL" || paymentStatus === "PENDING" || req.status === "PENDING";
+                  const requestCount = req.requestCount ?? req.student?.requestCount ?? 0;
 
                   return (
-                    <tr key={req.lesson?.enrollment?.enrollmentId || req.order?.id || idx}>
+                    <tr key={req.lessonEnrollmentId || req.lesson?.enrollment?.enrollmentId || req.orderId || req.order?.id || idx}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{studentName}</div>
                         <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                          {req.student?.academicId && <span style={{ marginRight: "6px", fontFamily: "monospace", fontWeight: 700 }}>{req.student.academicId}</span>}
-                          {req.student?.mobile && <span>{req.student.mobile}</span>}
+                          {academicId && <span style={{ marginRight: "8px" }}>ID: {academicId}</span>}
+                          {mobile && <span>{mobile}</span>}
                         </div>
-                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                          {req.student?.batch && <span className="badge badge-gray" style={{ marginRight: "4px", fontSize: "10px" }}>{req.student.batch}</span>}
-                          {req.student?.medium && <span className="badge badge-primary" style={{ marginRight: "4px", fontSize: "10px" }}>{req.student.medium}</span>}
-                        </div>
-                        {requestCount > 0 && (
-                          <div style={{ marginTop: "4px" }}>
-                            <span
-                              className={`badge ${requestCount >= 5 ? "badge-danger" : requestCount >= 3 ? "badge-warning" : "badge-gray"}`}
-                              style={{ fontSize: "10.5px" }}
-                              title="Number of lesson requests by this student in the current month"
-                            >
-                              ⚡ {requestCount} request{requestCount === 1 ? "" : "s"} this month
-                            </span>
+                        {(studentBatch || studentMedium) && (
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                            {[studentBatch, studentMedium].filter(Boolean).join(" • ")}
                           </div>
                         )}
+                        <div style={{ marginTop: "4px" }}>
+                          <span
+                            className="badge badge-info"
+                            style={{ fontSize: "10.5px", padding: "2px 6px" }}
+                            title="Total lesson enrollment requests this month"
+                          >
+                            Requests: {requestCount}
+                          </span>
+                        </div>
                       </td>
+
                       <td>
-                        <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{lessonName}</div>
-                        {req.lesson?.date && (
-                          <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                            📅 Date: {new Date(req.lesson.date).toLocaleDateString()}
-                          </div>
-                        )}
-                        <div style={{ fontSize: "11.5px", color: "var(--primary)", marginTop: "2px", fontWeight: 500 }}>
-                          {courseName} {req.lesson?.course?.code && `(${req.lesson.course.code})`}
+                        <div style={{ fontWeight: 600, color: "var(--text)" }}>{lessonName}</div>
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                          {courseName} {courseCode && <span style={{ color: "var(--text-muted)" }}>({courseCode})</span>}
                         </div>
-                        {req.lesson?.enrollment?.expiresAt && (
-                          <div style={{ fontSize: "10.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                            ⏳ Expires: {new Date(req.lesson.enrollment.expiresAt).toLocaleDateString()}
+                        {lessonDate && (
+                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                            Date: {lessonDate}
                           </div>
                         )}
                       </td>
+
                       <td>
-                        <div style={{ fontWeight: 700, fontSize: "13.5px" }}>
-                          LKR {Number(payment?.amount || order?.finalAmount || order?.total || 0).toLocaleString()}
+                        <div style={{ fontWeight: 600, color: "var(--text)" }}>
+                          LKR {Number(paymentAmount).toLocaleString()}
                         </div>
-                        <div style={{ fontSize: "11.5px", color: "var(--text-muted)", fontFamily: "monospace" }}>
-                          {order?.ordernumber || "-"}
+                        <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "2px", fontFamily: "monospace" }}>
+                          {orderNo}
                         </div>
                       </td>
+
                       <td>
-                        <span className="badge badge-primary" style={{ fontSize: "11px" }}>
-                          {payment?.paymentMethod || "DIGITAL"}
-                        </span>
-                        <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "3px", fontFamily: "monospace" }}>
-                          {evidence?.referenceNo || payment?.referenceNo || "-"}
+                        <div style={{ fontWeight: 500, fontSize: "12.5px" }}>{paymentMethod}</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                          Ref: {referenceNo}
                         </div>
-                        {payment?.processedBy && (
-                          <div style={{ fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                            By: {payment.processedBy}
-                          </div>
-                        )}
                       </td>
+
                       <td>
                         {slipUrl ? (
                           <button
                             className="btn btn-secondary btn-sm"
-                            style={{ fontSize: "11.5px", padding: "3px 8px" }}
+                            style={{ padding: "4px 8px", fontSize: "11.5px" }}
                             onClick={() => {
                               setSelectedReq(req);
                               setModalType("slip");
                             }}
                           >
-                            📷 View Slip
+                            View Slip
                           </button>
                         ) : (
-                          <span style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>No slip</span>
+                          <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>No Slip</span>
                         )}
                       </td>
+
                       <td>
-                        <span className={`badge ${STATUS_BADGE[payment?.status] || STATUS_BADGE[req.lesson?.enrollment?.status] || "badge-gray"}`}>
-                          {payment?.status || req.lesson?.enrollment?.status || "UNKNOWN"}
+                        <span className={`badge ${STATUS_BADGE[paymentStatus] || "badge-gray"}`}>
+                          {paymentStatus}
                         </span>
                       </td>
+
                       <td>
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          {isPending && isAdmin ? (
+                        <div className="action-buttons">
+                          {isPending ? (
                             <>
                               <button
-                                className="btn btn-primary btn-sm"
+                                className="btn btn-success btn-sm"
                                 style={{ padding: "3px 8px", fontSize: "11.5px" }}
                                 onClick={() => {
                                   setSelectedReq(req);
@@ -417,7 +420,7 @@ export default function LessonPaymentsPage() {
             </div>
             <div className="modal-body" style={{ textAlign: "center" }}>
               <img
-                src={resolveMediaUrl(selectedReq.payment?.evidence?.fileUrl)}
+                src={resolveMediaUrl(selectedReq.slipUrl || selectedReq.payment?.evidence?.fileUrl)}
                 alt="Payment Slip"
                 style={{ maxWidth: "100%", maxHeight: "70vh", objectFit: "contain", borderRadius: "4px" }}
                 onError={(e) => {
@@ -426,7 +429,7 @@ export default function LessonPaymentsPage() {
                 }}
               />
               <div style={{ display: "none", padding: "20px", color: "var(--text-muted)" }}>
-                Unable to preview image directly. <a href={resolveMediaUrl(selectedReq.payment?.evidence?.fileUrl)} target="_blank" rel="noreferrer">Open file</a>
+                Unable to preview image directly. <a href={resolveMediaUrl(selectedReq.slipUrl || selectedReq.payment?.evidence?.fileUrl)} target="_blank" rel="noreferrer">Open file</a>
               </div>
             </div>
           </div>
@@ -446,9 +449,9 @@ export default function LessonPaymentsPage() {
                 Are you sure you want to approve this lesson payment and grant access to the student?
               </p>
               <div style={{ background: "var(--bg)", padding: "12px", borderRadius: "6px", fontSize: "13px" }}>
-                <div><strong>Lesson:</strong> {selectedReq.lesson?.name}</div>
-                <div><strong>Student:</strong> {selectedReq.student?.firstName} {selectedReq.student?.lastName} ({selectedReq.student?.academicId})</div>
-                <div><strong>Amount:</strong> LKR {Number(selectedReq.payment?.amount || 0).toLocaleString()}</div>
+                <div><strong>Lesson:</strong> {selectedReq.lessonName || selectedReq.lesson?.name}</div>
+                <div><strong>Student:</strong> {selectedReq.studentName || `${selectedReq.student?.firstName || ""} ${selectedReq.student?.lastName || ""}`} ({selectedReq.academicId || selectedReq.student?.academicId})</div>
+                <div><strong>Amount:</strong> LKR {Number(selectedReq.paymentAmount ?? selectedReq.payment?.amount ?? 0).toLocaleString()}</div>
               </div>
             </div>
             <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
