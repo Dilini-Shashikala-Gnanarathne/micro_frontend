@@ -10,6 +10,7 @@ export default function LessonsPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ name: "", courseId: "", status: "", page: 1, size: 20 });
   const [total, setTotal] = useState(0);
+  const [selectedLessonIds, setSelectedLessonIds] = useState([]);
 
   // Fetch courses for dropdown
   useEffect(() => {
@@ -45,6 +46,20 @@ export default function LessonsPage() {
     fetchLessons();
   }, [filters.courseId, filters.status]);
 
+  const toggleLessonSelect = (id) => {
+    setSelectedLessonIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedLessonIds.length === lessons.length && lessons.length > 0) {
+      setSelectedLessonIds([]);
+    } else {
+      setSelectedLessonIds(lessons.map((l) => l.id));
+    }
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -54,14 +69,60 @@ export default function LessonsPage() {
             Video lessons, documents, and individual session classes
           </p>
         </div>
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={() => navigate("/enroll")}
-          id="btn-enroll-lessons"
-        >
-          + Enroll in Lessons
-        </button>
+        <div style={{ display: "flex", gap: "10px" }}>
+          {selectedLessonIds.length > 0 && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate(`/enroll?type=lesson&lessonIds=${selectedLessonIds.join(",")}`)}
+              id="btn-enroll-selected-header"
+            >
+              Enroll in {selectedLessonIds.length} Selected Lesson(s) →
+            </button>
+          )}
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => navigate("/enroll?type=lesson")}
+            id="btn-enroll-lessons"
+          >
+            + Test Lesson Enrollment
+          </button>
+        </div>
       </div>
+
+      {/* Selected Lessons Action Toolbar */}
+      {selectedLessonIds.length > 0 && (
+        <div
+          style={{
+            background: "var(--primary-light)",
+            border: "1.5px solid var(--primary)",
+            borderRadius: "var(--radius-sm)",
+            padding: "10px 16px",
+            marginBottom: "16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ fontSize: "13.5px", fontWeight: 600, color: "var(--primary)" }}>
+            ⚡ <strong>{selectedLessonIds.length}</strong> lesson(s) selected for enrollment testing (Endpoint: POST /api/enroll/lesson)
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setSelectedLessonIds([])}
+            >
+              Clear
+            </button>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate(`/enroll?type=lesson&lessonIds=${selectedLessonIds.join(",")}`)}
+              id="btn-enroll-selected-banner"
+            >
+              Proceed to Enroll ({selectedLessonIds.length}) →
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">
@@ -148,6 +209,14 @@ export default function LessonsPage() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: "36px" }}>
+                    <input
+                      type="checkbox"
+                      checked={lessons.length > 0 && selectedLessonIds.length === lessons.length}
+                      onChange={toggleSelectAll}
+                      id="check-select-all-lessons"
+                    />
+                  </th>
                   <th>#</th>
                   <th>Lesson Name</th>
                   <th>Parent Course</th>
@@ -155,11 +224,20 @@ export default function LessonsPage() {
                   <th>Watch Limit</th>
                   <th>Status</th>
                   <th>Access</th>
+                  <th style={{ textAlign: "right" }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {lessons.map((l, i) => (
                   <tr key={l.id}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={selectedLessonIds.includes(l.id)}
+                        onChange={() => toggleLessonSelect(l.id)}
+                        id={`check-lesson-${l.id}`}
+                      />
+                    </td>
                     <td style={{ color: "var(--text-muted)", fontSize: "12px" }}>{i + 1}</td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{l.name}</div>
@@ -186,6 +264,15 @@ export default function LessonsPage() {
                       ) : (
                         <span className="badge badge-primary">Paid</span>
                       )}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => navigate(`/enroll?type=lesson&lessonIds=${l.id}`)}
+                        id={`btn-enroll-single-lesson-${l.id}`}
+                      >
+                        Enroll
+                      </button>
                     </td>
                   </tr>
                 ))}
