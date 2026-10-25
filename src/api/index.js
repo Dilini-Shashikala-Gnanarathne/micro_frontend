@@ -111,6 +111,7 @@ export const getEnrollDetails = (id) => api.get('/api/enroll', { params: { id } 
 // Course Requests (admin)
 export const getCourseRequests = (params) => api.get('/api/enroll/requests/course', { params });
 export const getPackageRequests = (params) => api.get('/api/enroll/requests/package', { params });
+export const getLessonRequests = (params) => api.get('/api/enroll/requests/lesson', { params });
 
 // Payment approve & reject (admin)
 export const approvePayment = (paymentId) => api.put(`/api/payment/${paymentId}/approve`);

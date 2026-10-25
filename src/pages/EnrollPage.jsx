@@ -881,6 +881,16 @@ export default function EnrollPage() {
                   </button>
                 )}
 
+                {enrollType === "lesson" && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => navigate("/payments/lesson")}
+                    id="btn-goto-lesson-payments"
+                  >
+                    View in Lesson Requests
+                  </button>
+                )}
+
                 <button className="btn btn-primary" onClick={reset} id="btn-new-enroll">
                   + Test Another Enrollment
                 </button>

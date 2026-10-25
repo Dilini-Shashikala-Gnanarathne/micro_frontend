@@ -12,6 +12,7 @@ import LessonsPage from "./pages/LessonsPage";
 import EnrollPage from "./pages/EnrollPage";
 import CoursePaymentsPage from "./pages/CoursePaymentsPage";
 import PackagePaymentsPage from "./pages/PackagePaymentsPage";
+import LessonPaymentsPage from "./pages/LessonPaymentsPage";
 import CreatePackagePage from "./pages/CreatePackagePage";
 import PackageBuyPage from "./pages/PackageBuyPage";
 import InstitutesPage from "./pages/InstitutesPage";
@@ -69,6 +70,7 @@ function App() {
             <Route path="/enroll" element={<EnrollPage />} />
             <Route path="/payments/course" element={<CoursePaymentsPage />} />
             <Route path="/payments/package" element={<PackagePaymentsPage />} />
+            <Route path="/payments/lesson" element={<ProtectedRoute adminOnly><LessonPaymentsPage /></ProtectedRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
