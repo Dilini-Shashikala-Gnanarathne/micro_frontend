@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getCourses } from "../api";
 import toast from "react-hot-toast";
 
@@ -9,6 +10,7 @@ const STATUS_BADGE = {
 };
 
 export default function CoursesPage() {
+  const navigate = useNavigate();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ name: "", medium: "", courseType: "", status: "", page: 1, size: 10 });
@@ -37,8 +39,15 @@ export default function CoursesPage() {
       <div className="flex justify-between items-center mb-4">
         <div>
           <h2 style={{fontWeight:800,fontSize:"18px"}}>Courses</h2>
-          <p style={{color:"var(--text-secondary)",fontSize:"13px"}}>Manage all available courses</p>
+          <p style={{color:"var(--text-secondary)",fontSize:"13px"}}>Manage and enroll in available courses</p>
         </div>
+        <button
+          className="btn btn-primary btn-sm"
+          onClick={() => navigate("/enroll?type=course")}
+          id="btn-new-course-enroll"
+        >
+          + Enroll in Course
+        </button>
       </div>
 
       <div className="card">
@@ -94,6 +103,7 @@ export default function CoursesPage() {
                   <th>Price (LKR)</th>
                   <th>Status</th>
                   <th>Free</th>
+                  <th style={{ textAlign: "right" }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,6 +124,15 @@ export default function CoursesPage() {
                     </td>
                     <td><span className={`badge ${STATUS_BADGE[c.status] || "badge-gray"}`}>{c.status}</span></td>
                     <td>{c.isFree ? <span className="badge badge-success">Free</span> : <span className="badge badge-gray">Paid</span>}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => navigate(`/enroll?type=course&courseId=${c.id}`)}
+                        id={`btn-enroll-course-${c.id}`}
+                      >
+                        Enroll Now
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

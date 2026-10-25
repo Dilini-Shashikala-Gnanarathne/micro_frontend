@@ -102,6 +102,9 @@ export const enrollCourse = (data) => api.post('/api/enroll/course', data);
 export const enrollPackage = (data) => api.post('/api/enroll/package', data);
 export const enrollLesson = (data) => api.post('/api/enroll/lesson', data);
 export const updateEnrollment = (data) => api.post('/api/enroll/update', data);
+export const updateCourseEnrollment = (data) => api.put('/api/enroll/update/course', data);
+export const updatePackageEnrollment = (data) => api.put('/api/enroll/update/package', data);
+export const updateLessonEnrollment = (data) => api.put('/api/enroll/update/lesson', data);
 export const cancelEnrollment = (data) => api.post('/api/enroll/cancel', data);
 export const getEnrollDetails = (id) => api.get('/api/enroll', { params: { id } });
 

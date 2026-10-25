@@ -1,6 +1,16 @@
-﻿import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { getCourses, getPackages, getLessons, enrollCourse, enrollPackage, enrollLesson, updateEnrollment, uploadPaymentSlip, getPhysicalInstitutes } from "../api";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  getCourses,
+  getPackages,
+  getLessons,
+  enrollCourse,
+  enrollPackage,
+  enrollLesson,
+  cancelEnrollment,
+  uploadPaymentSlip,
+  getPhysicalInstitutes
+} from "../api";
 import toast from "react-hot-toast";
 
 const STEPS = ["Select Type", "Choose Item", "Payment Method", "Upload Slip", "Confirm"];
@@ -17,14 +27,21 @@ function StepIndicator({ current }) {
             <span className={`step-label ${i < current ? "done" : i === current ? "active" : ""}`}>{label}</span>
           </div>
           {i < STEPS.length - 1 && (
-            <div className="step-line" style={{ flex: 1, height: 2, margin: "0 10px", background: i < current ? "var(--primary)" : "var(--border)" }} />
+            <div
+              className="step-line"
+              style={{
+                flex: 1,
+                height: 2,
+                margin: "0 10px",
+                background: i < current ? "var(--primary)" : "var(--border)",
+              }}
+            />
           )}
         </div>
       ))}
     </div>
   );
 }
-
 
 const isTuteAvailable = (item) => {
   if (!item) return false;
@@ -48,7 +65,11 @@ function CourseCard({ course, selected, onSelect }) {
     : null;
 
   return (
-    <div className={`course-card${selected ? " selected" : ""}`} onClick={() => onSelect(course)} id={`card-course-${course.id}`}>
+    <div
+      className={`course-card${selected ? " selected" : ""}`}
+      onClick={() => onSelect(course)}
+      id={`card-course-${course.id}`}
+    >
       <div className="course-img" style={{ position: "relative" }}>
         {imageSrc ? (
           <img
@@ -58,7 +79,17 @@ function CourseCard({ course, selected, onSelect }) {
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          <div className="course-img-placeholder" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "white" }}>
+          <div
+            className="course-img-placeholder"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              color: "white",
+            }}
+          >
             <span style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "0.5px", opacity: 0.95, textTransform: "uppercase" }}>
               {course.code || "COURSE"}
             </span>
@@ -74,7 +105,7 @@ function CourseCard({ course, selected, onSelect }) {
           {course.code}
           {isTuteAvailable(course) && (
             <span className="badge badge-info" style={{ marginLeft: "6px", fontSize: "10px", padding: "2px 6px" }}>
-              📚 Tute Available
+              📦 Tute Available
             </span>
           )}
         </div>
@@ -97,7 +128,9 @@ function CourseCard({ course, selected, onSelect }) {
 
 export default function EnrollPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(0);
+
   const [enrollType, setEnrollType] = useState(""); // course | package | lesson
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -106,6 +139,9 @@ export default function EnrollPage() {
   const [slipFile, setSlipFile] = useState(null);
   const [referenceNo, setReferenceNo] = useState("");
   const [enrollResult, setEnrollResult] = useState(null);
+  const [lastApiCall, setLastApiCall] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchQ, setSearchQ] = useState("");
   const [needTute, setNeedTute] = useState(false);
@@ -121,6 +157,67 @@ export default function EnrollPage() {
       })
       .catch((err) => console.error("Failed to load physical institutes", err));
   }, []);
+
+  // Handle URL query parameters for pre-selection (course, package, lesson)
+  useEffect(() => {
+    const typeParam = searchParams.get("type");
+    const courseIdParam = searchParams.get("courseId") || searchParams.get("id");
+    const packageIdParam = searchParams.get("packageId");
+    const lessonIdsParam = searchParams.get("lessonIds");
+
+    if (!typeParam) return;
+
+    if (typeParam === "course") {
+      setEnrollType("course");
+      setLoading(true);
+      getCourses({ size: 100 })
+        .then((res) => {
+          const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
+          setItems(Array.isArray(list) ? list : []);
+          if (courseIdParam) {
+            const found = (Array.isArray(list) ? list : []).find((c) => c.id === courseIdParam);
+            if (found) {
+              setSelected(found);
+              setStep(2);
+            } else {
+              setStep(1);
+            }
+          } else {
+            setStep(1);
+          }
+        })
+        .catch((err) => toast.error(err.response?.data?.message || "Failed to load courses"))
+        .finally(() => setLoading(false));
+    } else if (typeParam === "package") {
+      if (packageIdParam) {
+        navigate(`/packages/${packageIdParam}/buy`);
+      } else {
+        handleSelectType("package");
+      }
+    } else if (typeParam === "lesson") {
+      setEnrollType("lesson");
+      setLoading(true);
+      getLessons({ size: 100 })
+        .then((res) => {
+          const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
+          setItems(Array.isArray(list) ? list : []);
+          if (lessonIdsParam) {
+            const ids = lessonIdsParam.split(",").map((s) => s.trim());
+            const matched = (Array.isArray(list) ? list : []).filter((l) => ids.includes(l.id));
+            if (matched.length > 0) {
+              setSelectedLessons(matched);
+              setStep(2);
+            } else {
+              setStep(1);
+            }
+          } else {
+            setStep(1);
+          }
+        })
+        .catch((err) => toast.error(err.response?.data?.message || "Failed to load lessons"))
+        .finally(() => setLoading(false));
+    }
+  }, [searchParams]);
 
   const PAYMENT_METHODS = [
     {
@@ -159,15 +256,15 @@ export default function EnrollPage() {
       if (type === "course") {
         const res = await getCourses({ size: 50 });
         const list = res.data?.data?.data || res.data?.data?.items || res.data?.data || [];
-        setItems(list);
+        setItems(Array.isArray(list) ? list : []);
       } else if (type === "package") {
         const res = await getPackages({ size: 50 });
         const list = res.data?.data?.data || res.data?.data?.items || res.data?.data || [];
-        setItems(list);
+        setItems(Array.isArray(list) ? list : []);
       } else if (type === "lesson") {
         const res = await getLessons({ size: 50 });
         const list = res.data?.data?.data || res.data?.data?.items || res.data?.data || [];
-        setItems(list);
+        setItems(Array.isArray(list) ? list : []);
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load items");
@@ -188,11 +285,15 @@ export default function EnrollPage() {
 
   const handleEnroll = async () => {
     setLoading(true);
+    let payload = {};
+    let endpoint = "";
+
     try {
       let res;
       if (enrollType === "course") {
-                const payload = { courseId: selected.id, paymentMethod };
-        const hasTute = Boolean(selected.hasTute ?? selected.has_tute);
+        endpoint = "POST /api/enroll/course";
+        payload = { courseId: selected.id, paymentMethod };
+        const hasTute = isTuteAvailable(selected);
         if (hasTute) {
           payload.needTute = needTute;
           if (needTute) {
@@ -209,18 +310,30 @@ export default function EnrollPage() {
         }
         res = await enrollCourse(payload);
       } else if (enrollType === "package") {
-        res = await enrollPackage({
+        endpoint = "POST /api/enroll/package";
+        payload = {
           packageCombinationId: selected.packageCombinationId || selected.id,
           paymentMethod,
-        });
+        };
+        res = await enrollPackage(payload);
       } else if (enrollType === "lesson") {
-        res = await enrollLesson({
+        endpoint = "POST /api/enroll/lesson";
+        payload = {
           lessonIds: selectedLessons.map((l) => l.id),
           paymentMethod,
-        });
+        };
+        res = await enrollLesson(payload);
       }
+
       const data = res.data?.data || res.data;
       setEnrollResult(data);
+      setLastApiCall({
+        endpoint,
+        status: res.status || 201,
+        requestPayload: payload,
+        responsePayload: res.data,
+        timestamp: new Date().toLocaleTimeString(),
+      });
       toast.success(res.data?.message || "Enrollment processed successfully!");
 
       if (paymentMethod === "DIGITAL") {
@@ -229,7 +342,15 @@ export default function EnrollPage() {
         setStep(4); // Instant completion for ONLINE, MANUAL, PAY_LATER
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Enrollment failed");
+      const errorMsg = err.response?.data?.message || err.message || "Enrollment failed";
+      toast.error(errorMsg);
+      setLastApiCall({
+        endpoint,
+        status: err.response?.status || 400,
+        requestPayload: payload,
+        responsePayload: err.response?.data || { error: errorMsg },
+        timestamp: new Date().toLocaleTimeString(),
+      });
     } finally {
       setLoading(false);
     }
@@ -248,7 +369,6 @@ export default function EnrollPage() {
 
     setLoading(true);
     try {
-      // 1. Try uploading slip file if provided and paymentId is returned
       if (slipFile && enrollResult?.paymentId) {
         const formData = new FormData();
         formData.append("data", JSON.stringify({
@@ -260,20 +380,31 @@ export default function EnrollPage() {
         await uploadPaymentSlip(formData).catch(() => null);
       }
 
-      // 2. Update enrollment payment evidence via /api/enroll/update
-      // await updateEnrollment({
-      //   orderId: orderId,
-      //   paymentMethod: "DIGITAL",
-      //   evidenceReferenceNo: referenceNo.trim(),
-      //   remarks: "Bank slip submitted for verification"
-      // });
-
       toast.success("Payment details & slip submitted successfully!");
       setStep(4);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit payment evidence");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelEnrollmentTest = async () => {
+    const orderId = enrollResult?.orderId;
+    if (!orderId) {
+      toast.error("No Order ID available to cancel.");
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const res = await cancelEnrollment({ orderId });
+      setCancelMessage(res.data?.message || "Enrollment cancelled and associated records deleted.");
+      toast.success("Enrollment cancelled successfully (Endpoint: POST /api/enroll/cancel)");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to cancel enrollment");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -286,6 +417,8 @@ export default function EnrollPage() {
     setSlipFile(null);
     setReferenceNo("");
     setEnrollResult(null);
+    setLastApiCall(null);
+    setCancelMessage("");
     setNeedTute(false);
     setNeedHomeDelivery(true);
     setDeliveryInstituteId("");
@@ -299,11 +432,16 @@ export default function EnrollPage() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h2 style={{ fontWeight: 800, fontSize: "18px" }}>Enroll Student</h2>
+          <h2 style={{ fontWeight: 800, fontSize: "18px" }}>Enroll Student & Test Endpoints</h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "13px" }}>
-            Process course, package or lesson enrollment
+            Test course, package, and lesson enrollment endpoints directly
           </p>
         </div>
+        {enrollType && (
+          <button className="btn btn-secondary btn-sm" onClick={reset}>
+            Reset / Change Type
+          </button>
+        )}
       </div>
 
       <div className="card">
@@ -316,9 +454,9 @@ export default function EnrollPage() {
               <h3 style={{ fontWeight: 700, fontSize: "15px", marginBottom: "16px" }}>What would you like to enroll in?</h3>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
                 {[
-                  { type: "course", title: "Single Course", desc: "Enroll in a theory, paper, or extra class", badge: "Most Popular", icon: "📚" },
-                  { type: "package", title: "Course Package", desc: "Bundle of courses with combination pricing", badge: "Save More", icon: "📦" },
-                  { type: "lesson", title: "Individual Lessons", desc: "Specific lessons or missed recorded sessions", badge: "Flexible", icon: "🎯" },
+                  { type: "course", title: "Single Course", desc: "Endpoint: POST /api/enroll/course", badge: "Course Endpoint", icon: "📚" },
+                  { type: "package", title: "Course Package", desc: "Endpoint: POST /api/enroll/package", badge: "Package Endpoint", icon: "📦" },
+                  { type: "lesson", title: "Individual Lessons", desc: "Endpoint: POST /api/enroll/lesson", badge: "Lesson Endpoint", icon: "🎬" },
                 ].map((opt) => (
                   <div
                     key={opt.type}
@@ -350,11 +488,17 @@ export default function EnrollPage() {
               <div className="flex justify-between items-center mb-4">
                 <h3 style={{ fontWeight: 700, fontSize: "15px" }}>Select a {enrollType}</h3>
                 <button className="btn btn-secondary btn-sm" onClick={() => setStep(0)} id="btn-back-type">
-                  ← Back
+                  Back
                 </button>
               </div>
               <div style={{ marginBottom: "16px" }}>
-                <input className="form-control" placeholder="Search..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} id="enroll-search" />
+                <input
+                  className="form-control"
+                  placeholder="Search..."
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  id="enroll-search"
+                />
               </div>
               {loading ? (
                 <div className="page-loader"><div className="spinner spinner-dark" /></div>
@@ -426,11 +570,11 @@ export default function EnrollPage() {
             </div>
           )}
 
-          {/* Step 2: Payment Method */}
+          {/* Step 2: Payment Method & Tute Options */}
           {step === 2 && (
-            <div style={{ maxWidth: "520px", margin: "0 auto" }}>
+            <div style={{ maxWidth: "560px", margin: "0 auto" }}>
               <div className="flex justify-between items-center mb-4">
-                <h3 style={{ fontWeight: 700 }}>Select Payment Method</h3>
+                <h3 style={{ fontWeight: 700 }}>Select Payment Method & Options</h3>
                 <button className="btn btn-secondary btn-sm" onClick={() => setStep(1)} id="btn-back-item">Back</button>
               </div>
               <div className="alert alert-info">
@@ -449,87 +593,62 @@ export default function EnrollPage() {
                     background: needTute ? "var(--primary-light)" : "var(--bg)",
                     transition: "all .2s ease",
                   }}
-                  id="section-tute-request"
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: "13.5px", display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span>📚</span> Study Material & Tute Delivery
-                      </div>
-                      <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                        Printed study packs and tutorials are available for this course.
-                      </div>
-                    </div>
-                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 700, fontSize: "13px" }}>
-                      <input
-                        type="checkbox"
-                        checked={needTute}
-                        onChange={(e) => setNeedTute(e.target.checked)}
-                        style={{ width: 18, height: 18, accentColor: "var(--primary)", cursor: "pointer" }}
-                        id="chk-need-tute"
-                      />
-                      Request Tute
-                    </label>
-                  </div>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      fontSize: "13.5px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={needTute}
+                      onChange={(e) => setNeedTute(e.target.checked)}
+                      id="checkbox-need-tute"
+                      style={{ width: "16px", height: "16px" }}
+                    />
+                    <span>Request Printed Study Material / Tutes</span>
+                  </label>
 
                   {needTute && (
-                    <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "14px", marginTop: "12px" }}>
-                      <div style={{ fontWeight: 600, fontSize: "12.5px", marginBottom: "8px" }}>
-                        Choose Delivery Destination:
-                      </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
-                        <div
-                          onClick={() => setNeedHomeDelivery(true)}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: "var(--radius-sm)",
-                            border: `1.5px solid ${needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
-                            background: needHomeDelivery ? "white" : "transparent",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            transition: "all .15s",
-                          }}
-                          id="opt-delivery-home"
-                        >
-                          <input
-                            type="radio"
-                            name="tuteDeliveryMethod"
-                            checked={needHomeDelivery}
-                            onChange={() => setNeedHomeDelivery(true)}
-                            style={{ accentColor: "var(--primary)", cursor: "pointer" }}
-                          />
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: "12.5px" }}>🏠 Home Delivery</div>
-                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Direct to your home</div>
+                    <div style={{ marginTop: "14px", borderTop: "1px dashed var(--border)", paddingTop: "14px" }}>
+                      <div className="form-group mb-2">
+                        <label className="form-label" style={{ fontSize: "12px", fontWeight: 700 }}>Delivery Mode:</label>
+                        <div style={{ display: "flex", gap: "10px" }}>
+                          <div
+                            onClick={() => setNeedHomeDelivery(true)}
+                            style={{
+                              flex: 1,
+                              border: `1.5px solid ${needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
+                              background: needHomeDelivery ? "white" : "transparent",
+                              padding: "10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              textAlign: "center",
+                            }}
+                            id="delivery-mode-home"
+                          >
+                            <div style={{ fontSize: "12.5px", fontWeight: 600 }}>🚚 Home Delivery</div>
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Direct to address</div>
                           </div>
-                        </div>
-
-                        <div
-                          onClick={() => setNeedHomeDelivery(false)}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: "var(--radius-sm)",
-                            border: `1.5px solid ${!needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
-                            background: !needHomeDelivery ? "white" : "transparent",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            transition: "all .15s",
-                          }}
-                          id="opt-delivery-institute"
-                        >
-                          <input
-                            type="radio"
-                            name="tuteDeliveryMethod"
-                            checked={!needHomeDelivery}
-                            onChange={() => setNeedHomeDelivery(false)}
-                            style={{ accentColor: "var(--primary)", cursor: "pointer" }}
-                          />
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: "12.5px" }}>🏛️ Institute Pickup</div>
+                          <div
+                            onClick={() => setNeedHomeDelivery(false)}
+                            style={{
+                              flex: 1,
+                              border: `1.5px solid ${!needHomeDelivery ? "var(--primary)" : "var(--border)"}`,
+                              background: !needHomeDelivery ? "white" : "transparent",
+                              padding: "10px",
+                              borderRadius: "6px",
+                              cursor: "pointer",
+                              textAlign: "center",
+                            }}
+                            id="delivery-mode-institute"
+                          >
+                            <div style={{ fontSize: "12.5px", fontWeight: 600 }}>🏛️ Institute Pickup</div>
                             <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Collect at institute</div>
                           </div>
                         </div>
@@ -563,7 +682,7 @@ export default function EnrollPage() {
                 </div>
                 ) : (
                   <div style={{ padding: "10px 14px", borderRadius: "var(--radius-sm)", background: "var(--bg)", border: "1px dashed var(--border)", marginBottom: "16px", fontSize: "12px", color: "var(--text-muted)" }}>
-                    ℹ️ This course is online-only and does not offer physical tutes/study material.
+                    ℹ️ This course does not offer separate physical printed tutes.
                   </div>
                 )
               )}
@@ -662,23 +781,108 @@ export default function EnrollPage() {
             </div>
           )}
 
-          {/* Step 4: Complete */}
+          {/* Step 4: Complete & Endpoint Inspector */}
           {step === 4 && (
-            <div style={{ textAlign: "center", padding: "40px 20px" }}>
-              <div style={{ fontSize: "64px", marginBottom: "16px" }}>🎉</div>
-              <h3 style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>Enrollment Processed!</h3>
-              <p style={{ color: "var(--text-secondary)", marginBottom: "16px" }}>
-                Your enrollment has been successfully recorded in the system.
-              </p>
-              {enrollResult?.orderId && (
-                <div style={{ display: "inline-block", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "10px 18px", marginBottom: "24px", fontSize: "13px" }}>
-                  Order Reference: <strong style={{ fontFamily: "monospace" }}>{enrollResult.orderId}</strong>
-                  {paymentMethod && <span style={{ marginLeft: "12px", color: "var(--primary)", fontWeight: 600 }}>({paymentMethod})</span>}
+            <div style={{ maxWidth: "720px", margin: "0 auto", padding: "20px 0" }}>
+              <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                <div style={{ fontSize: "56px", marginBottom: "12px" }}>🎉</div>
+                <h3 style={{ fontWeight: 800, fontSize: "22px", marginBottom: "6px" }}>
+                  Enrollment Endpoint Executed!
+                </h3>
+                <p style={{ color: "var(--text-secondary)", fontSize: "14px" }}>
+                  {enrollResult?.orderId ? (
+                    <>Order reference <strong>{enrollResult.orderId}</strong> generated successfully.</>
+                  ) : (
+                    "Enrollment action completed."
+                  )}
+                </p>
+              </div>
+
+              {cancelMessage && (
+                <div className="alert alert-warning mb-3">
+                  ⚠️ {cancelMessage}
                 </div>
               )}
-              <div>
-                <button className="btn btn-primary btn-lg" onClick={reset} id="btn-new-enroll">
-                  + New Enrollment
+
+              {/* Endpoint Inspector Box */}
+              {lastApiCall && (
+                <div
+                  style={{
+                    background: "#0f172a",
+                    color: "#e2e8f0",
+                    borderRadius: "8px",
+                    padding: "18px 20px",
+                    marginBottom: "24px",
+                    fontSize: "12.5px",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid #334155", paddingBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ background: "#2563eb", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700, fontSize: "11px" }}>
+                        ENDPOINT
+                      </span>
+                      <strong style={{ color: "#38bdf8", fontFamily: "monospace", fontSize: "13px" }}>
+                        {lastApiCall.endpoint}
+                      </strong>
+                    </div>
+                    <span style={{ color: "#4ade80", fontWeight: 600 }}>
+                      Status: {lastApiCall.status} OK
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    <div>
+                      <div style={{ color: "#94a3b8", fontWeight: 600, marginBottom: "4px" }}>Request Payload:</div>
+                      <pre style={{ background: "#1e293b", padding: "10px", borderRadius: "6px", overflowX: "auto", maxHeight: "180px", color: "#f8fafc", margin: 0, fontSize: "11px" }}>
+                        {JSON.stringify(lastApiCall.requestPayload, null, 2)}
+                      </pre>
+                    </div>
+                    <div>
+                      <div style={{ color: "#94a3b8", fontWeight: 600, marginBottom: "4px" }}>Endpoint Response:</div>
+                      <pre style={{ background: "#1e293b", padding: "10px", borderRadius: "6px", overflowX: "auto", maxHeight: "180px", color: "#f8fafc", margin: 0, fontSize: "11px" }}>
+                        {JSON.stringify(lastApiCall.responsePayload, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", justifyContent: "center" }}>
+                {enrollResult?.orderId && !cancelMessage && (
+                  <button
+                    className="btn btn-danger"
+                    onClick={handleCancelEnrollmentTest}
+                    disabled={cancelling}
+                    id="btn-test-cancel-enroll"
+                  >
+                    {cancelling ? <span className="spinner" /> : "Test Cancel Endpoint (POST /api/enroll/cancel)"}
+                  </button>
+                )}
+
+                {enrollType === "course" && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => navigate("/payments/course")}
+                    id="btn-goto-course-payments"
+                  >
+                    View in Course Requests
+                  </button>
+                )}
+
+                {enrollType === "package" && (
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => navigate("/payments/package")}
+                    id="btn-goto-package-payments"
+                  >
+                    View in Package Requests
+                  </button>
+                )}
+
+                <button className="btn btn-primary" onClick={reset} id="btn-new-enroll">
+                  + Test Another Enrollment
                 </button>
               </div>
             </div>
