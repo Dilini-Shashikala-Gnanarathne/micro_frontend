@@ -245,10 +245,13 @@ export default function LessonPaymentsPage() {
                   const studentBatch = req.studentBatch || req.student?.batch;
                   const studentMedium = req.studentMedium || req.student?.medium;
 
-                  const lessonName = req.lessonName || req.lesson?.name || "Lesson";
-                  const courseName = req.courseName || req.lesson?.course?.name || "-";
-                  const courseCode = req.courseCode || req.lesson?.course?.code || "";
-                  const lessonDate = req.lessonDate || req.lesson?.date;
+                  const lessons = Array.isArray(req.lessons) && req.lessons.length > 0 
+                    ? req.lessons 
+                    : req.lesson ? [req.lesson] : [];
+                  const lessonName = req.lessonName || req.lesson?.name || (lessons[0]?.name) || "Lesson";
+                  const courseName = req.courseName || req.lesson?.course?.name || (lessons[0]?.course?.name) || "-";
+                  const courseCode = req.courseCode || req.lesson?.course?.code || (lessons[0]?.course?.code) || "";
+                  const lessonDate = req.lessonDate || req.lesson?.date || (lessons[0]?.date);
 
                   const paymentAmount = req.paymentAmount ?? req.payment?.amount ?? req.order?.totalAmount ?? 0;
                   const orderNo = req.orderNo || req.order?.ordernumber || req.order?.order_no || "-";
@@ -284,13 +287,33 @@ export default function LessonPaymentsPage() {
                       </td>
 
                       <td>
-                        <div style={{ fontWeight: 600, color: "var(--text)" }}>{lessonName}</div>
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
-                          {courseName} {courseCode && <span style={{ color: "var(--text-muted)" }}>({courseCode})</span>}
-                        </div>
-                        {lessonDate && (
-                          <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
-                            Date: {lessonDate}
+                        {lessons.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {lessons.map((les, lIdx) => (
+                              <div key={les.id || lIdx} style={{ borderBottom: lessons.length > 1 && lIdx < lessons.length - 1 ? "1px dashed var(--border)" : "none", paddingBottom: lessons.length > 1 ? "4px" : "0" }}>
+                                <div style={{ fontWeight: 600, color: "var(--text)" }}>{les.name || "Lesson"}</div>
+                                <div style={{ fontSize: "11.5px", color: "var(--text-secondary)" }}>
+                                  {les.course?.name || "-"} {les.course?.code && <span style={{ color: "var(--text-muted)" }}>({les.course?.code})</span>}
+                                </div>
+                                {les.date && (
+                                  <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
+                                    Date: {les.date}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontWeight: 600, color: "var(--text)" }}>{lessonName}</div>
+                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>
+                              {courseName} {courseCode && <span style={{ color: "var(--text-muted)" }}>({courseCode})</span>}
+                            </div>
+                            {lessonDate && (
+                              <div style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "2px" }}>
+                                Date: {lessonDate}
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>
@@ -449,7 +472,7 @@ export default function LessonPaymentsPage() {
                 Are you sure you want to approve this lesson payment and grant access to the student?
               </p>
               <div style={{ background: "var(--bg)", padding: "12px", borderRadius: "6px", fontSize: "13px" }}>
-                <div><strong>Lesson:</strong> {selectedReq.lessonName || selectedReq.lesson?.name}</div>
+                <div><strong>Lesson(s):</strong> {(selectedReq.lessons?.map(l => l.name) || [selectedReq.lessonName || selectedReq.lesson?.name]).filter(Boolean).join(", ")}</div>
                 <div><strong>Student:</strong> {selectedReq.studentName || `${selectedReq.student?.firstName || ""} ${selectedReq.student?.lastName || ""}`} ({selectedReq.academicId || selectedReq.student?.academicId})</div>
                 <div><strong>Amount:</strong> LKR {Number(selectedReq.paymentAmount ?? selectedReq.payment?.amount ?? 0).toLocaleString()}</div>
               </div>
