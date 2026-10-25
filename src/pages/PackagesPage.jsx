@@ -35,15 +35,24 @@ export default function PackagesPage() {
           <h2 style={{fontWeight:800,fontSize:"18px"}}>Packages</h2>
           <p style={{color:"var(--text-secondary)",fontSize:"13px"}}>Course bundles and combination packages</p>
         </div>
-        {isAdmin && (
+        <div style={{ display: "flex", gap: "10px" }}>
           <button
-            className="btn btn-primary"
-            onClick={() => navigate("/packages/create")}
-            id="btn-create-package"
+            className="btn btn-secondary btn-sm"
+            onClick={() => navigate("/enroll?type=package")}
+            id="btn-test-package-enroll"
           >
-            + Create Package
+            + Test Package Enrollment
           </button>
-        )}
+          {isAdmin && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => navigate("/packages/create")}
+              id="btn-create-package"
+            >
+              + Create Package
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="card">

@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPackageById, enrollPackage, uploadPaymentSlip, getPhysicalInstitutes } from "../api";
+import { getPackageById, enrollPackage, uploadPaymentSlip, cancelEnrollment, getPhysicalInstitutes } from "../api";
 import toast from "react-hot-toast";
 
 const PAYMENT_METHODS = [
@@ -33,6 +33,9 @@ export default function PackageBuyPage() {
   const [slipFile, setSlipFile] = useState(null);
   const [slipPreview, setSlipPreview] = useState(null);
   const [uploadingSlip, setUploadingSlip] = useState(false);
+  const [lastApiCall, setLastApiCall] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState("");
 
   // Tute & Material State
   const [institutes, setInstitutes] = useState([]);
@@ -155,6 +158,13 @@ export default function PackageBuyPage() {
 
       const data = res.data?.data || res.data;
       setEnrollData(data);
+      setLastApiCall({
+        endpoint: "POST /api/enroll/package",
+        status: res.status || 201,
+        requestPayload: payload,
+        responsePayload: res.data,
+        timestamp: new Date().toLocaleTimeString(),
+      });
       toast.success(res.data?.message || "Package enrollment created successfully!");
 
       // If DIGITAL: Move to step 2 to upload evidence
@@ -173,6 +183,24 @@ export default function PackageBuyPage() {
   };
 
   // 2. STEP 2: ONLY CALL /api/payment/evidence/upload
+    const handleCancelPackageTest = async () => {
+    const orderId = enrollData?.orderId;
+    if (!orderId) {
+      toast.error("No Order ID found to cancel.");
+      return;
+    }
+    setCancelling(true);
+    try {
+      const res = await cancelEnrollment({ orderId });
+      setCancelMessage(res.data?.message || "Package enrollment cancelled and records deleted.");
+      toast.success("Package enrollment cancelled successfully (POST /api/enroll/cancel)");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to cancel package enrollment");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const handleUploadEvidence = async (e) => {
     e.preventDefault();
 
@@ -851,11 +879,11 @@ export default function PackageBuyPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* STEP 3: SUCCESS CONFIRMATION                                              */}
+      {/* STEP 3: SUCCESS CONFIRMATION & ENDPOINT TESTING INSPECTOR                 */}
       {/* ========================================================================= */}
       {step === 3 && (
-        <div style={{ maxWidth: "640px", margin: "20px auto" }}>
-          <div className="card text-center" style={{ padding: "40px 28px" }}>
+        <div style={{ maxWidth: "760px", margin: "20px auto" }}>
+          <div className="card text-center" style={{ padding: "36px 28px" }}>
             <div
               style={{
                 width: "56px",
@@ -873,22 +901,33 @@ export default function PackageBuyPage() {
               ✓
             </div>
             <h2 style={{ fontWeight: 800, fontSize: "22px", marginBottom: "6px" }}>
-              Enrollment Successful!
+              Package Enrollment Endpoint Executed!
             </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "13.5px", marginBottom: "20px" }}>
-              Your enrollment for <strong>{pkg.name}</strong> (Combination {selectedCombination?.code}) has been received.
+              Your enrollment for <strong>{pkg.name}</strong> (Combination {selectedCombination?.code}) has been processed.
             </p>
 
+            {cancelMessage && (
+              <div className="alert alert-warning mb-3 text-left">
+                ⚠️ {cancelMessage}
+              </div>
+            )}
+
+            {/* Summary Box */}
             <div
               style={{
                 background: "var(--bg)",
                 padding: "16px",
                 borderRadius: "var(--radius-sm)",
                 textAlign: "left",
-                marginBottom: "24px",
+                marginBottom: "20px",
                 fontSize: "13px",
               }}
             >
+              <div className="flex justify-between mb-2">
+                <span style={{ color: "var(--text-muted)" }}>Order Reference</span>
+                <strong style={{ fontFamily: "monospace" }}>{enrollData?.orderId || "-"}</strong>
+              </div>
               <div className="flex justify-between mb-2">
                 <span style={{ color: "var(--text-muted)" }}>Package</span>
                 <strong>{pkg.name}</strong>
@@ -915,12 +954,69 @@ export default function PackageBuyPage() {
               </div>
             </div>
 
-            <div className="flex justify-center gap-3">
-              <button className="btn btn-secondary" onClick={() => navigate("/dashboard")}>
-                Go to Dashboard
+            {/* API Endpoint Inspector Box */}
+            {lastApiCall && (
+              <div
+                style={{
+                  background: "#0f172a",
+                  color: "#e2e8f0",
+                  borderRadius: "8px",
+                  padding: "18px 20px",
+                  marginBottom: "24px",
+                  fontSize: "12.5px",
+                  textAlign: "left",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid #334155", paddingBottom: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ background: "#2563eb", color: "white", padding: "2px 8px", borderRadius: "4px", fontWeight: 700, fontSize: "11px" }}>
+                      ENDPOINT
+                    </span>
+                    <strong style={{ color: "#38bdf8", fontFamily: "monospace", fontSize: "13px" }}>
+                      {lastApiCall.endpoint}
+                    </strong>
+                  </div>
+                  <span style={{ color: "#4ade80", fontWeight: 600 }}>
+                    Status: {lastApiCall.status} OK
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <div style={{ color: "#94a3b8", fontWeight: 600, marginBottom: "4px" }}>Request Payload:</div>
+                    <pre style={{ background: "#1e293b", padding: "10px", borderRadius: "6px", overflowX: "auto", maxHeight: "180px", color: "#f8fafc", margin: 0, fontSize: "11px" }}>
+                      {JSON.stringify(lastApiCall.requestPayload, null, 2)}
+                    </pre>
+                  </div>
+                  <div>
+                    <div style={{ color: "#94a3b8", fontWeight: 600, marginBottom: "4px" }}>Endpoint Response:</div>
+                    <pre style={{ background: "#1e293b", padding: "10px", borderRadius: "6px", overflowX: "auto", maxHeight: "180px", color: "#f8fafc", margin: 0, fontSize: "11px" }}>
+                      {JSON.stringify(lastApiCall.responsePayload, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex justify-center gap-3 flex-wrap">
+              {enrollData?.orderId && !cancelMessage && (
+                <button
+                  className="btn btn-danger"
+                  onClick={handleCancelPackageTest}
+                  disabled={cancelling}
+                  id="btn-test-cancel-package-enroll"
+                >
+                  {cancelling ? <span className="spinner" /> : "Test Cancel Endpoint (POST /api/enroll/cancel)"}
+                </button>
+              )}
+
+              <button className="btn btn-secondary" onClick={() => navigate("/payments/package")}>
+                View in Package Requests
               </button>
-              <button className="btn btn-primary" onClick={() => navigate("/payments/package")}>
-                View My Package Requests
+              <button className="btn btn-primary" onClick={() => navigate("/packages")}>
+                Test Another Package
               </button>
             </div>
           </div>
