@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getCourses,
+  updateCourseEnrollment,
+  updatePackageEnrollment,
+  updateLessonEnrollment,
   getPackages,
   getLessons,
   enrollCourse,
@@ -144,6 +147,13 @@ export default function EnrollPage() {
   const [cancelMessage, setCancelMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchQ, setSearchQ] = useState("");
+  const [updatePaymentMethod, setUpdatePaymentMethod] = useState("MANUAL");
+  const [updateNeedTute, setUpdateNeedTute] = useState(false);
+  const [updateNeedHomeDelivery, setUpdateNeedHomeDelivery] = useState(true);
+  const [updateDeliveryInstituteId, setUpdateDeliveryInstituteId] = useState("");
+  const [updateSelectedLessonIds, setUpdateSelectedLessonIds] = useState([]);
+  const [updating, setUpdating] = useState(false);
+  const [showUpdatePanel, setShowUpdatePanel] = useState(true);
   const [needTute, setNeedTute] = useState(false);
   const [needHomeDelivery, setNeedHomeDelivery] = useState(true);
   const [deliveryInstituteId, setDeliveryInstituteId] = useState("");
@@ -405,6 +415,76 @@ export default function EnrollPage() {
       toast.error(err.response?.data?.message || "Failed to cancel enrollment");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleTestUpdate = async () => {
+    const orderId = enrollResult?.orderId || enrollResult?.id;
+    if (!orderId) {
+      toast.error("No active Order ID available to update.");
+      return;
+    }
+
+    setUpdating(true);
+    let endpoint = "";
+    let payload = {};
+
+    try {
+      let res;
+      if (enrollType === "course") {
+        endpoint = "PUT /api/enroll/update/course";
+        payload = {
+          orderId,
+          paymentMethod: updatePaymentMethod,
+          needTute: updateNeedTute,
+          needHomeDelivery: updateNeedHomeDelivery,
+          deliveryInstituteId: updateNeedTute && !updateNeedHomeDelivery ? (updateDeliveryInstituteId || null) : null,
+        };
+        res = await updateCourseEnrollment(payload);
+      } else if (enrollType === "package") {
+        endpoint = "PUT /api/enroll/update/package";
+        payload = {
+          orderId,
+          paymentMethod: updatePaymentMethod,
+          packageCombinationId: selected?.packageCombinationId || selected?.id,
+          items: [],
+        };
+        res = await updatePackageEnrollment(payload);
+      } else if (enrollType === "lesson") {
+        if (!updateSelectedLessonIds.length) {
+          toast.error("Please select at least one lesson for the update.");
+          setUpdating(false);
+          return;
+        }
+        endpoint = "PUT /api/enroll/update/lesson";
+        payload = {
+          orderId,
+          paymentMethod: updatePaymentMethod,
+          lessonIds: updateSelectedLessonIds,
+        };
+        res = await updateLessonEnrollment(payload);
+      }
+
+      toast.success(res.data?.message || "Enrollment updated successfully via Strategy manager!");
+      setLastApiCall({
+        endpoint,
+        status: res.status || 200,
+        requestPayload: payload,
+        responsePayload: res.data,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || "Update enrollment failed";
+      toast.error(errorMsg);
+      setLastApiCall({
+        endpoint,
+        status: err.response?.status || 400,
+        requestPayload: payload,
+        responsePayload: err.response?.data || { error: errorMsg },
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -844,6 +924,160 @@ export default function EnrollPage() {
                         {JSON.stringify(lastApiCall.responsePayload, null, 2)}
                       </pre>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Update Enrollment Strategy Test Panel */}
+              {enrollResult?.orderId && !cancelMessage && (
+                <div
+                  style={{
+                    border: "1.5px solid #3b82f6",
+                    background: "#f0f7ff",
+                    borderRadius: "8px",
+                    padding: "18px 20px",
+                    marginBottom: "24px",
+                    textAlign: "left",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+                    <div>
+                      <h4 style={{ fontWeight: 800, fontSize: "15px", margin: 0, color: "#1e3a8a" }}>
+                        🔄 Test Strategy Pattern: Update Enrollment
+                      </h4>
+                      <div style={{ fontSize: "12px", color: "#475569", marginTop: "2px" }}>
+                        Tests: <code style={{ color: "#2563eb", fontWeight: 700 }}>PUT /api/enroll/update/{enrollType}</code>
+                      </div>
+                    </div>
+                    <span className="badge badge-primary">
+                      Order: {enrollResult.orderId}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", marginBottom: "14px" }}>
+                    {/* Payment Method Switcher */}
+                    <div>
+                      <label className="form-label" style={{ fontSize: "12.5px", fontWeight: 700 }}>
+                        Update Payment Method
+                      </label>
+                      <select
+                        className="form-control"
+                        value={updatePaymentMethod}
+                        onChange={(e) => setUpdatePaymentMethod(e.target.value)}
+                        style={{ fontSize: "13px" }}
+                        id="update-pm-select"
+                      >
+                        <option value="DIGITAL">DIGITAL (Bank Transfer)</option>
+                        <option value="MANUAL">MANUAL (Cash at Institute)</option>
+                        <option value="ONLINE">ONLINE (Card Gateway)</option>
+                        <option value="PAY_LATER">PAY_LATER</option>
+                      </select>
+                    </div>
+
+                    {/* Course specific options: Tute */}
+                    {enrollType === "course" && (
+                      <div>
+                        <label className="form-label" style={{ fontSize: "12.5px", fontWeight: 700 }}>
+                          Tute & Delivery Options
+                        </label>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+                          <label style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+                            <input
+                              type="checkbox"
+                              checked={updateNeedTute}
+                              onChange={(e) => setUpdateNeedTute(e.target.checked)}
+                              id="update-need-tute"
+                            />
+                            Request Printed Tute
+                          </label>
+
+                          {updateNeedTute && (
+                            <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+                              <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                                <input
+                                  type="radio"
+                                  name="updateDelivery"
+                                  checked={updateNeedHomeDelivery}
+                                  onChange={() => setUpdateNeedHomeDelivery(true)}
+                                />
+                                Home Delivery
+                              </label>
+                              <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                                <input
+                                  type="radio"
+                                  name="updateDelivery"
+                                  checked={!updateNeedHomeDelivery}
+                                  onChange={() => setUpdateNeedHomeDelivery(false)}
+                                />
+                                Institute Pickup
+                              </label>
+                            </div>
+                          )}
+
+                          {updateNeedTute && !updateNeedHomeDelivery && (
+                            <select
+                              className="form-control"
+                              value={updateDeliveryInstituteId}
+                              onChange={(e) => setUpdateDeliveryInstituteId(e.target.value)}
+                              style={{ fontSize: "12px", marginTop: "4px" }}
+                            >
+                              <option value="">Select Pickup Institute</option>
+                              {institutes.map((inst) => (
+                                <option key={inst.id} value={inst.id}>{inst.name}</option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lesson specific options: Select different lessons */}
+                  {enrollType === "lesson" && items.length > 0 && (
+                    <div style={{ marginBottom: "14px" }}>
+                      <label className="form-label" style={{ fontSize: "12.5px", fontWeight: 700 }}>
+                        Re-select / Toggle Enrolled Lessons (replaces previous lesson enrollments via LessonEnrollmentStrategy):
+                      </label>
+                      <div style={{ maxHeight: "150px", overflowY: "auto", border: "1px solid #cbd5e1", borderRadius: "6px", background: "white", padding: "8px" }}>
+                        {items.map((les) => {
+                          const isChecked = updateSelectedLessonIds.includes(les.id);
+                          return (
+                            <label
+                              key={les.id}
+                              style={{ display: "flex", alignItems: "center", gap: "8px", padding: "4px 6px", fontSize: "12.5px", cursor: "pointer", borderBottom: "1px solid #f1f5f9" }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setUpdateSelectedLessonIds([...updateSelectedLessonIds, les.id]);
+                                  } else {
+                                    setUpdateSelectedLessonIds(updateSelectedLessonIds.filter((id) => id !== les.id));
+                                  }
+                                }}
+                              />
+                              <span style={{ fontWeight: 600 }}>{les.name}</span>
+                              <span style={{ color: "#64748b", fontSize: "11px", marginLeft: "auto" }}>
+                                LKR {Number(les.price || 0).toLocaleString()}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleTestUpdate}
+                      disabled={updating}
+                      id="btn-execute-strategy-update"
+                      style={{ background: "#2563eb", borderColor: "#2563eb" }}
+                    >
+                      {updating ? <span className="spinner" /> : "🚀 Execute Strategy Update (PUT)"}
+                    </button>
                   </div>
                 </div>
               )}
