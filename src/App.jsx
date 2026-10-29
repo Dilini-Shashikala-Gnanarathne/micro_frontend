@@ -22,6 +22,7 @@ import ExamTypesPage from "./pages/ExamTypesPage";
 import FreeCardStudentsPage from "./pages/FreeCardStudentsPage";
 import TuteRequestsPage from "./pages/TuteRequestsPage";
 import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
+import StudentIncidentsPage from "./pages/StudentIncidentsPage";
 
 function App() {
   return (
@@ -89,6 +90,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/student-incidents" element={<StudentIncidentsPage />} />
             <Route path="/institutes" element={<InstitutesPage />} />
             <Route
               path="/tute-requests"

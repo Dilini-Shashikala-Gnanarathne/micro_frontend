@@ -195,5 +195,13 @@ export const removeFreeCardStudent = (studentId, classId) => {
 };
 export const removeFreeCardStudentsBulk = (items) => api.post('/api/user/free-card/students/bulk-remove', items);
 
+// Student Incidents
+export const getStudentIncidents = (studentId, params) => api.get(`/api/user/student/${studentId}/incidents`, { params });
+export const getStudentIncidentById = (incidentId) => api.get(`/api/user/student/incident/${incidentId}`);
+export const createStudentIncident = (studentId, data) => api.post(`/api/user/student/${studentId}/incident`, data);
+export const updateStudentIncident = (incidentId, data) => api.put(`/api/user/student/incident/${incidentId}`, data);
+export const deleteStudentIncident = (incidentId) => api.delete(`/api/user/student/incident/${incidentId}`);
+
+
 
 
