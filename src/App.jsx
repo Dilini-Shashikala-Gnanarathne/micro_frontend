@@ -81,6 +81,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/free-card-students"
+              element={
+                <ProtectedRoute adminOnly>
+                  <FreeCardStudentsPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/institutes" element={<InstitutesPage />} />
             <Route
               path="/tute-requests"

@@ -187,7 +187,13 @@ export const deleteExamType = (id) => api.delete(`/api/academic/exam-type/${id}`
 // Free Card Students (Admin)
 export const getFreeCardStudents = (params) => api.get('/api/user/free-card/students', { params });
 export const addFreeCardStudent = (data) => api.post('/api/user/free-card/student', data);
+export const addFreeCardStudentsBulk = (items) => api.post('/api/user/free-card/students/bulk', items);
 export const updateFreeCardStudent = (studentId, data) => api.put(`/api/user/free-card/student/${studentId}`, data);
-export const removeFreeCardStudent = (studentId) => api.delete(`/api/user/free-card/student/${studentId}`);
+export const removeFreeCardStudent = (studentId, classId) => {
+  const url = classId ? `/api/user/free-card/student/${studentId}?classId=${encodeURIComponent(classId)}` : `/api/user/free-card/student/${studentId}`;
+  return api.delete(url);
+};
+export const removeFreeCardStudentsBulk = (items) => api.post('/api/user/free-card/students/bulk-remove', items);
+
 
 
