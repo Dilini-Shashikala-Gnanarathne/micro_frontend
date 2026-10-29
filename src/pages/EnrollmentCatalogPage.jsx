@@ -85,7 +85,8 @@ export default function EnrollmentCatalogPage() {
 
       const res = await filterEnrollmentCourses(params);
       const data = res.data?.data || res.data || [];
-      setCourses(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data) ? data : (data.data || []);
+      setCourses(items);
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.message || "Failed to load courses for enrollment");
