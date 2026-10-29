@@ -116,7 +116,7 @@ export default function CoursesPage() {
       const res = await getCourses(cleanParams);
       const data = res.data?.data || res.data || {};
       const items = data.items || data.data || (Array.isArray(data) ? data : []);
-      const totalCount = data.total ?? data.totalItems ?? items.length;
+      const totalCount = data.totalCount ?? data.total ?? data.totalItems ?? items.length;
 
       setCourses(items);
       setTotal(totalCount);
