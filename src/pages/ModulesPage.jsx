@@ -23,7 +23,7 @@ export default function ModulesPage() {
   const [totalItems, setTotalItems] = useState(0);
 
   // Filters & Pagination state
-  const [keyword, setKeyword] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', '1', '0'
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -50,8 +50,8 @@ export default function ModulesPage() {
         sortDir,
       };
 
-      if (keyword.trim()) {
-        params.keyword = keyword.trim();
+      if (nameFilter.trim()) {
+        params.name = nameFilter.trim();
       }
 
       if (statusFilter !== 'ALL') {
@@ -63,7 +63,7 @@ export default function ModulesPage() {
 
       // PagedResponse structure
       const items = Array.isArray(payload) ? payload : (payload.data || []);
-      const total = payload.totalItems ?? items.length;
+      const total = payload.totalCount ?? payload.totalItems ?? items.length;
 
       setModules(items);
       setTotalItems(total);
@@ -74,7 +74,7 @@ export default function ModulesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, sortDir, keyword, statusFilter]);
+  }, [page, pageSize, sortDir, nameFilter, statusFilter]);
 
   useEffect(() => {
     fetchModules();
@@ -298,9 +298,9 @@ export default function ModulesPage() {
                 type="text"
                 className="form-control"
                 placeholder="Search module by name..."
-                value={keyword}
+                value={nameFilter}
                 onChange={(e) => {
-                  setKeyword(e.target.value);
+                  setNameFilter(e.target.value);
                   setPage(1);
                 }}
                 id="input-search-module"
@@ -344,11 +344,11 @@ export default function ModulesPage() {
             </div>
 
             {/* Reset Filter Button */}
-            {(keyword || statusFilter !== 'ALL') && (
+            {(nameFilter || statusFilter !== 'ALL') && (
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => {
-                  setKeyword('');
+                  setNameFilter('');
                   setStatusFilter('ALL');
                   setPage(1);
                 }}
@@ -430,10 +430,10 @@ export default function ModulesPage() {
                 </svg>
               </div>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-                {keyword || statusFilter !== 'ALL' ? 'No matching modules found' : 'No modules created yet'}
+                {nameFilter || statusFilter !== 'ALL' ? 'No matching modules found' : 'No modules created yet'}
               </h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: 13, maxWidth: 380, margin: '0 auto 18px' }}>
-                {keyword || statusFilter !== 'ALL'
+                {nameFilter || statusFilter !== 'ALL'
                   ? 'Try adjusting your search criteria or resetting filters to find modules.'
                   : 'Get started by creating your first academic module for structuring courses and lessons.'}
               </p>
