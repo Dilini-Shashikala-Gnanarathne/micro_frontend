@@ -18,6 +18,8 @@ import CreatePackagePage from "./pages/CreatePackagePage";
 import PackageBuyPage from "./pages/PackageBuyPage";
 import InstitutesPage from "./pages/InstitutesPage";
 import ModulesPage from "./pages/ModulesPage";
+import ExamTypesPage from "./pages/ExamTypesPage";
+import FreeCardStudentsPage from "./pages/FreeCardStudentsPage";
 import TuteRequestsPage from "./pages/TuteRequestsPage";
 import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
 
@@ -68,6 +70,14 @@ function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <ModulesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/exam-types"
+              element={
+                <ProtectedRoute adminOnly>
+                  <ExamTypesPage />
                 </ProtectedRoute>
               }
             />

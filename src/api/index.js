@@ -178,4 +178,16 @@ export const createModule = (data) => api.post('/api/academic/module', data);
 export const updateModule = (id, data) => api.put(`/api/academic/module/${id}`, data);
 export const deleteModule = (id) => api.delete(`/api/academic/module/${id}`);
 
+// Exam Types (Admin)
+export const getExamTypes = (params) => api.get('/api/academic/exam-types/filter', { params });
+export const createExamType = (data) => api.post('/api/academic/exam-type', data);
+export const updateExamType = (id, data) => api.put(`/api/academic/exam-type/${id}`, data);
+export const deleteExamType = (id) => api.delete(`/api/academic/exam-type/${id}`);
+
+// Free Card Students (Admin)
+export const getFreeCardStudents = (params) => api.get('/api/user/free-card/students', { params });
+export const addFreeCardStudent = (data) => api.post('/api/user/free-card/student', data);
+export const updateFreeCardStudent = (studentId, data) => api.put(`/api/user/free-card/student/${studentId}`, data);
+export const removeFreeCardStudent = (studentId) => api.delete(`/api/user/free-card/student/${studentId}`);
+
 

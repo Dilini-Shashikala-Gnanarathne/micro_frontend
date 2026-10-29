@@ -1,0 +1,991 @@
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import toast from 'react-hot-toast';
+import {
+  getFreeCardStudents,
+  addFreeCardStudent,
+  updateFreeCardStudent,
+  removeFreeCardStudent,
+  getStudents,
+  getBatches,
+} from '../api';
+import { useAuth } from '../contexts/AuthContext';
+
+export default function FreeCardStudentsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'SUPER_ADMIN';
+
+  // Data states
+  const [students, setStudents] = useState([]);
+  const [batches, setBatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
+
+  // Filters & Pagination state
+  const [keyword, setKeyword] = useState('');
+  const [batchId, setBatchId] = useState('');
+  const [tagFilter, setTagFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortDir, setSortDir] = useState('DESC');
+
+  // Add Free Card Modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [searchingStudents, setSearchingStudents] = useState(false);
+  const [searchedStudents, setSearchedStudents] = useState([]);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [addNote, setAddNote] = useState('');
+  const [addTag, setAddTag] = useState('');
+  const [submittingAdd, setSubmittingAdd] = useState(false);
+
+  // Edit Free Card Modal state
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editNote, setEditNote] = useState('');
+  const [editTag, setEditTag] = useState('');
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+
+  // Revoke/Delete Modal state
+  const [revokingStudent, setRevokingStudent] = useState(null);
+  const [submittingRevoke, setSubmittingRevoke] = useState(false);
+
+  // Load batches for filter dropdown
+  useEffect(() => {
+    getBatches()
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setBatches(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch Free-Card Students
+  const fetchFreeCardStudents = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {
+        page,
+        size: pageSize,
+        sortDir,
+      };
+
+      if (keyword.trim()) params.keyword = keyword.trim();
+      if (batchId) params.batchId = batchId;
+      if (tagFilter.trim()) params.tag = tagFilter.trim();
+
+      const res = await getFreeCardStudents(params);
+      const data = res.data?.data || res.data || {};
+
+      const list = data.students || (Array.isArray(data) ? data : []);
+      const total = data.pagination?.total ?? list.length;
+
+      setStudents(list);
+      setTotalItems(total);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to fetch free-card students');
+      setStudents([]);
+      setTotalItems(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize, sortDir, keyword, batchId, tagFilter]);
+
+  useEffect(() => {
+    fetchFreeCardStudents();
+  }, [fetchFreeCardStudents]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Search candidate students for granting free card
+  const handleSearchStudents = async (query) => {
+    setStudentSearchTerm(query);
+    if (!query.trim()) {
+      setSearchedStudents([]);
+      return;
+    }
+
+    setSearchingStudents(true);
+    try {
+      const res = await getStudents({ name: query.trim(), size: 15 });
+      const items = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
+      setSearchedStudents(items);
+    } catch (err) {
+      setSearchedStudents([]);
+    } finally {
+      setSearchingStudents(false);
+    }
+  };
+
+  // Open Add Modal
+  const openAddModal = () => {
+    setSelectedStudent(null);
+    setStudentSearchTerm('');
+    setSearchedStudents([]);
+    setAddNote('');
+    setAddTag('');
+    setIsAddModalOpen(true);
+  };
+
+  const closeAddModal = () => {
+    if (submittingAdd) return;
+    setIsAddModalOpen(false);
+    setSelectedStudent(null);
+  };
+
+  // Submit Grant Free Card
+  const handleSubmitAdd = async (e) => {
+    e.preventDefault();
+    if (!selectedStudent) {
+      return toast.error('Please select a student first.');
+    }
+
+    if (addTag.trim().length > 8) {
+      return toast.error('Tag cannot exceed 8 characters.');
+    }
+
+    if (addNote.trim().length > 100) {
+      return toast.error('Note cannot exceed 100 characters.');
+    }
+
+    setSubmittingAdd(true);
+    try {
+      await addFreeCardStudent({
+        studentId: selectedStudent.id,
+        note: addNote.trim() || null,
+        tag: addTag.trim() || null,
+      });
+
+      toast.success(`Free card granted to ${selectedStudent.name || selectedStudent.fname || 'student'}!`);
+      closeAddModal();
+      fetchFreeCardStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add free-card student.');
+    } finally {
+      setSubmittingAdd(false);
+    }
+  };
+
+  // Open Edit Modal
+  const openEditModal = (stu) => {
+    setEditingStudent(stu);
+    setEditNote(stu.note || '');
+    setEditTag(stu.tag || '');
+  };
+
+  const closeEditModal = () => {
+    if (submittingEdit) return;
+    setEditingStudent(null);
+  };
+
+  // Submit Edit Free Card
+  const handleSubmitEdit = async (e) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+
+    if (editTag.trim().length > 8) {
+      return toast.error('Tag cannot exceed 8 characters.');
+    }
+
+    if (editNote.trim().length > 100) {
+      return toast.error('Note cannot exceed 100 characters.');
+    }
+
+    setSubmittingEdit(true);
+    try {
+      await updateFreeCardStudent(editingStudent.student_id, {
+        note: editNote.trim() || null,
+        tag: editTag.trim() || null,
+      });
+
+      toast.success('Free-card details updated successfully!');
+      closeEditModal();
+      fetchFreeCardStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update free card.');
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
+  // Submit Revoke Free Card
+  const handleConfirmRevoke = async () => {
+    if (!revokingStudent) return;
+
+    setSubmittingRevoke(true);
+    try {
+      await removeFreeCardStudent(revokingStudent.student_id);
+      toast.success(`Free card revoked for ${revokingStudent.name || 'student'}.`);
+      setRevokingStudent(null);
+
+      if (students.length === 1 && page > 1) {
+        setPage((p) => p - 1);
+      } else {
+        fetchFreeCardStudents();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to revoke free card.');
+    } finally {
+      setSubmittingRevoke(false);
+    }
+  };
+
+  return (
+    <div className="page-content">
+      {/* Top Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 4 }}>
+            Free-Card Students
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13.5 }}>
+            Manage privileged students granted free access cards, special scholarships, and custom tags.
+          </p>
+        </div>
+
+        {isAdmin && (
+          <button className="btn btn-primary" onClick={openAddModal} id="btn-add-free-card">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Grant Free Card
+          </button>
+        )}
+      </div>
+
+      {/* Stats Cards */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: 24 }}>
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+            </svg>
+          </div>
+          <div className="stat-info">
+            <div className="label">Total Free-Card Holders</div>
+            <div className="value">{totalItems}</div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-icon" style={{ background: 'var(--secondary-light)', color: 'var(--secondary)' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div className="stat-info">
+            <div className="label">Active on this Page</div>
+            <div className="value" style={{ color: 'var(--secondary)' }}>{students.length}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Filter & Table Card */}
+      <div className="card">
+        {/* Filter Toolbar */}
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: 14, background: '#fafbfc' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', flex: 1 }}>
+            {/* Keyword Search */}
+            <div className="search-input" style={{ minWidth: 260, maxWidth: 360, flex: 1 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+              </svg>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Search by name, ID, mobile, or note..."
+                value={keyword}
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                  setPage(1);
+                }}
+                id="input-search-free-card"
+              />
+            </div>
+
+            {/* Batch Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Batch:</label>
+              <select
+                className="form-control"
+                style={{ width: 150 }}
+                value={batchId}
+                onChange={(e) => {
+                  setBatchId(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All Batches</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name || b.year}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tag Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Tag:</label>
+              <input
+                type="text"
+                className="form-control"
+                style={{ width: 120 }}
+                placeholder="e.g. VIP"
+                value={tagFilter}
+                maxLength={8}
+                onChange={(e) => {
+                  setTagFilter(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+
+            {/* Sort Order */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Sort:</label>
+              <select
+                className="form-control"
+                style={{ width: 140 }}
+                value={sortDir}
+                onChange={(e) => {
+                  setSortDir(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="DESC">Recently Added</option>
+                <option value="ASC">Oldest First</option>
+              </select>
+            </div>
+
+            {/* Clear Filters */}
+            {(keyword || batchId || tagFilter) && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setKeyword('');
+                  setBatchId('');
+                  setTagFilter('');
+                  setPage(1);
+                }}
+                title="Reset filters"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+
+          {/* Page size & Refresh */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select
+              className="form-control"
+              style={{ width: 110, fontSize: 12.5 }}
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+            >
+              <option value={5}>5 / page</option>
+              <option value={10}>10 / page</option>
+              <option value={20}>20 / page</option>
+              <option value={50}>50 / page</option>
+            </select>
+
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={fetchFreeCardStudents}
+              disabled={loading}
+              title="Refresh list"
+              style={{ height: 36, padding: '0 12px' }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Table Content */}
+        <div className="table-wrap">
+          {loading ? (
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{
+                width: 38,
+                height: 38,
+                border: '3px solid var(--border)',
+                borderTopColor: 'var(--primary)',
+                borderRadius: '50%',
+                margin: '0 auto 16px',
+                animation: 'spin 0.8s linear infinite'
+              }} />
+              <p style={{ fontWeight: 500 }}>Loading free-card students...</p>
+            </div>
+          ) : students.length === 0 ? (
+            <div style={{ padding: '60px 24px', textAlign: 'center' }}>
+              <div style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                background: 'var(--bg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 16px',
+                color: 'var(--text-muted)'
+              }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{ width: 32, height: 32 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 002.25 19.5z" />
+                </svg>
+              </div>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+                {keyword || batchId || tagFilter ? 'No matching free-card students' : 'No free-card students assigned yet'}
+              </h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, maxWidth: 400, margin: '0 auto 18px' }}>
+                {keyword || batchId || tagFilter
+                  ? 'Try clearing your filters or searching with different keywords.'
+                  : 'Grant free academic cards to students for full tuition exemption and scholarship benefits.'}
+              </p>
+              {isAdmin && (
+                <button className="btn btn-primary btn-sm" onClick={openAddModal}>
+                  + Grant Free Card to Student
+                </button>
+              )}
+            </div>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: 60 }}>#</th>
+                  <th>Student Info</th>
+                  <th style={{ width: 140 }}>Batch</th>
+                  <th style={{ width: 120 }}>Tag</th>
+                  <th>Note / Justification</th>
+                  <th style={{ width: 110 }}>Status</th>
+                  {isAdmin && <th style={{ width: 160, textAlign: 'right' }}>Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((stu, index) => {
+                  const rowNumber = (page - 1) * pageSize + index + 1;
+                  return (
+                    <tr key={stu.student_id}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+                        {rowNumber}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {stu.profileUrl ? (
+                            <img
+                              src={stu.profileUrl}
+                              alt=""
+                              style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: '50%',
+                              background: 'var(--primary-light)',
+                              color: 'var(--primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              flexShrink: 0
+                            }}>
+                              {(stu.name?.[0] || stu.firstName?.[0] || 'S').toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-primary)' }}>
+                              {stu.name || `${stu.firstName} ${stu.lastName}`.trim()}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                              ID: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{stu.academicId || stu.student_id}</span>
+                              {stu.mobile && ` • ${stu.mobile}`}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-secondary)' }}>
+                          {stu.batchName || '—'}
+                        </span>
+                      </td>
+                      <td>
+                        {stu.tag ? (
+                          <span className="badge badge-primary" style={{ fontWeight: 700, letterSpacing: '0.04em' }}>
+                            #{stu.tag}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ fontSize: 12.5, color: stu.note ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                          {stu.note || 'No note attached'}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${stu.status === 'ACTIVE' ? 'badge-success' : 'badge-gray'}`}>
+                          {stu.status || 'ACTIVE'}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 6 }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openEditModal(stu)}
+                              title="Edit tag and note"
+                              style={{ padding: '5px 10px' }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" style={{ width: 14, height: 14 }}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                              </svg>
+                              Edit
+                            </button>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setRevokingStudent(stu)}
+                              title="Revoke free card privilege"
+                              style={{ padding: '5px 10px', color: 'var(--danger)' }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" style={{ width: 14, height: 14 }}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                              </svg>
+                              Revoke
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination Bar */}
+        {!loading && students.length > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 24px',
+            borderTop: '1px solid var(--border)',
+            flexWrap: 'wrap',
+            gap: 12
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              Showing <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{(page - 1) * pageSize + 1}</span> to{' '}
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{Math.min(page * pageSize, totalItems)}</span> of{' '}
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{totalItems}</span> students
+            </div>
+
+            <div className="pagination" style={{ margin: 0 }}>
+              <button
+                className="page-btn"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                title="Previous Page"
+              >
+                ‹
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .map((p, idx, arr) => {
+                  const prev = arr[idx - 1];
+                  const hasGap = prev && p - prev > 1;
+
+                  return (
+                    <span key={p} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      {hasGap && <span style={{ padding: '0 4px', color: 'var(--text-muted)' }}>…</span>}
+                      <button
+                        className={`page-btn${p === page ? ' active' : ''}`}
+                        onClick={() => setPage(p)}
+                      >
+                        {p}
+                      </button>
+                    </span>
+                  );
+                })}
+
+              <button
+                className="page-btn"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                title="Next Page"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* GRANT FREE CARD MODAL */}
+      {isAddModalOpen && (
+        <div className="modal-overlay" onClick={closeAddModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--primary-light)',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: 20, height: 20 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="modal-title">Grant Free Academic Card</h3>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    Exempt a student from course tuition fees
+                  </p>
+                </div>
+              </div>
+              <button className="modal-close" onClick={closeAddModal} disabled={submittingAdd}>✕</button>
+            </div>
+
+            <form onSubmit={handleSubmitAdd}>
+              <div className="modal-body">
+                {/* Student Picker */}
+                <div className="form-group">
+                  <label className="form-label">
+                    Select Student <span>*</span>
+                  </label>
+
+                  {!selectedStudent ? (
+                    <div>
+                      <div className="search-input" style={{ width: '100%' }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Search student by name, academic ID, mobile..."
+                          value={studentSearchTerm}
+                          onChange={(e) => handleSearchStudents(e.target.value)}
+                          autoFocus
+                          disabled={submittingAdd}
+                        />
+                      </div>
+
+                      {/* Search Results Dropdown */}
+                      {searchingStudents && (
+                        <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-muted)' }}>
+                          Searching students...
+                        </div>
+                      )}
+
+                      {searchedStudents.length > 0 && !searchingStudents && (
+                        <div style={{
+                          maxHeight: 180,
+                          overflowY: 'auto',
+                          border: '1.5px solid var(--border)',
+                          borderRadius: 'var(--radius-sm)',
+                          marginTop: 6,
+                          background: 'white'
+                        }}>
+                          {searchedStudents.map((s) => (
+                            <div
+                              key={s.id}
+                              onClick={() => {
+                                setSelectedStudent(s);
+                                setSearchedStudents([]);
+                              }}
+                              style={{
+                                padding: '9px 12px',
+                                borderBottom: '1px solid var(--border)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                transition: 'background 0.15s ease'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                  {s.fname || s.firstName} {s.lname || s.lastName}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                  {s.academicId || s.academic_id} • {s.mobile}
+                                </div>
+                              </div>
+                              <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600 }}>
+                                Select →
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'var(--primary-light)',
+                      border: '1.5px solid #bfdbfe',
+                      padding: '12px 14px',
+                      borderRadius: 'var(--radius-sm)'
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary-dark)' }}>
+                          {selectedStudent.fname || selectedStudent.firstName} {selectedStudent.lname || selectedStudent.lastName}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          ID: <span style={{ fontFamily: 'monospace' }}>{selectedStudent.academicId || selectedStudent.academic_id || selectedStudent.id}</span>
+                          {selectedStudent.mobile && ` • ${selectedStudent.mobile}`}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setSelectedStudent(null)}
+                        disabled={submittingAdd}
+                        style={{ background: 'white' }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tag Input */}
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Card Tag (Optional)
+                    </label>
+                    <span style={{ fontSize: 11, color: addTag.length > 7 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                      {addTag.length} / 8 chars
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. SCHOLAR, VIP, STAFF, 2026A"
+                    value={addTag}
+                    maxLength={8}
+                    onChange={(e) => setAddTag(e.target.value.toUpperCase())}
+                    disabled={submittingAdd}
+                  />
+                  <div className="form-hint">
+                    Short identifier tag (max 8 uppercase characters).
+                  </div>
+                </div>
+
+                {/* Note Input */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Note / Reason (Optional)
+                    </label>
+                    <span style={{ fontSize: 11, color: addNote.length > 90 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                      {addNote.length} / 100 chars
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    className="form-control"
+                    placeholder="e.g. Merit concession approved for exceptional exam performance"
+                    value={addNote}
+                    maxLength={100}
+                    onChange={(e) => setAddNote(e.target.value)}
+                    disabled={submittingAdd}
+                  />
+                  <div className="form-hint">
+                    Internal administration remarks (max 100 characters).
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeAddModal} disabled={submittingAdd}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingAdd || !selectedStudent}>
+                  {submittingAdd ? 'Granting Card...' : 'Grant Free Card'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT FREE CARD MODAL */}
+      {editingStudent && (
+        <div className="modal-overlay" onClick={closeEditModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Edit Free Card</h3>
+              <button className="modal-close" onClick={closeEditModal} disabled={submittingEdit}>✕</button>
+            </div>
+
+            <form onSubmit={handleSubmitEdit}>
+              <div className="modal-body">
+                {/* Student info banner */}
+                <div style={{
+                  background: 'var(--bg)',
+                  padding: '12px 14px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border)',
+                  marginBottom: 16
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {editingStudent.name || `${editingStudent.firstName} ${editingStudent.lastName}`.trim()}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                    Academic ID: {editingStudent.academicId || '—'}
+                  </div>
+                </div>
+
+                {/* Tag Input */}
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Card Tag
+                    </label>
+                    <span style={{ fontSize: 11, color: editTag.length > 7 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                      {editTag.length} / 8 chars
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. SCHOLAR"
+                    value={editTag}
+                    maxLength={8}
+                    onChange={(e) => setEditTag(e.target.value.toUpperCase())}
+                    disabled={submittingEdit}
+                  />
+                </div>
+
+                {/* Note Input */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Note / Remarks
+                    </label>
+                    <span style={{ fontSize: 11, color: editNote.length > 90 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                      {editNote.length} / 100 chars
+                    </span>
+                  </div>
+                  <textarea
+                    rows={2}
+                    className="form-control"
+                    placeholder="Remarks..."
+                    value={editNote}
+                    maxLength={100}
+                    onChange={(e) => setEditNote(e.target.value)}
+                    disabled={submittingEdit}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={closeEditModal} disabled={submittingEdit}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submittingEdit}>
+                  {submittingEdit ? 'Saving...' : 'Update Free Card'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* REVOKE CONFIRMATION MODAL */}
+      {revokingStudent && (
+        <div className="modal-overlay" onClick={() => !submittingRevoke && setRevokingStudent(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header" style={{ borderBottomColor: 'var(--danger-light)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'var(--danger-light)',
+                  color: 'var(--danger)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" style={{ width: 20, height: 20 }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                </div>
+                <h3 className="modal-title" style={{ color: '#9b1c1c' }}>
+                  Revoke Free Card
+                </h3>
+              </div>
+              <button className="modal-close" onClick={() => !submittingRevoke && setRevokingStudent(null)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-primary)', marginBottom: 12 }}>
+                Are you sure you want to revoke the free card privilege for this student?
+              </p>
+              <div style={{
+                background: 'var(--bg)',
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                marginBottom: 14
+              }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 14 }}>
+                  {revokingStudent.name || `${revokingStudent.firstName} ${revokingStudent.lastName}`.trim()}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  Academic ID: {revokingStudent.academicId || '—'}
+                  {revokingStudent.tag && ` • Tag: #${revokingStudent.tag}`}
+                </div>
+              </div>
+              <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                Revoking this card will remove fee exemptions and return the student to standard payment requirements.
+              </p>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setRevokingStudent(null)}
+                disabled={submittingRevoke}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleConfirmRevoke}
+                disabled={submittingRevoke}
+              >
+                {submittingRevoke ? 'Revoking...' : 'Yes, Revoke Card'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
