@@ -1,5 +1,6 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { getCourses } from "../api";
 import toast from "react-hot-toast";
 
@@ -11,6 +12,7 @@ const STATUS_BADGE = {
 
 export default function CoursesPage() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ name: "", medium: "", courseType: "", status: "", page: 1, size: 10 });
@@ -41,13 +43,25 @@ export default function CoursesPage() {
           <h2 style={{fontWeight:800,fontSize:"18px"}}>Courses</h2>
           <p style={{color:"var(--text-secondary)",fontSize:"13px"}}>Manage and enroll in available courses</p>
         </div>
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={() => navigate("/enroll?type=course")}
-          id="btn-new-course-enroll"
-        >
-          + Enroll in Course
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          {isAdmin && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => navigate("/manual-enrollment")}
+              id="btn-manual-enroll"
+              style={{ fontWeight: 600 }}
+            >
+              ⚡ Manual Enroll (Admin)
+            </button>
+          )}
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => navigate("/enroll?type=course")}
+            id="btn-new-course-enroll"
+          >
+            + Enroll in Course
+          </button>
+        </div>
       </div>
 
       <div className="card">
@@ -125,13 +139,25 @@ export default function CoursesPage() {
                     <td><span className={`badge ${STATUS_BADGE[c.status] || "badge-gray"}`}>{c.status}</span></td>
                     <td>{c.isFree ? <span className="badge badge-success">Free</span> : <span className="badge badge-gray">Paid</span>}</td>
                     <td style={{ textAlign: "right" }}>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => navigate(`/enroll?type=course&courseId=${c.id}`)}
-                        id={`btn-enroll-course-${c.id}`}
-                      >
-                        Enroll Now
-                      </button>
+                      <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                        {isAdmin && (
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => navigate(`/manual-enrollment?courseId=${c.id}`)}
+                            title="Manually enroll students into this course"
+                            style={{ fontSize: "11px", padding: "3px 8px" }}
+                          >
+                            Manual Enroll
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => navigate(`/enroll?type=course&courseId=${c.id}`)}
+                          id={`btn-enroll-course-${c.id}`}
+                        >
+                          Enroll Now
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
