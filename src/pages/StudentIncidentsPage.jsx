@@ -6,18 +6,19 @@ import {
   createStudentIncident,
   updateStudentIncident,
   deleteStudentIncident,
+  getIncidentStates,
   getStudents,
 } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 
-const SEVERITY_OPTIONS = ['Low', 'Medium', 'High', 'Critical'];
-const STATUS_OPTIONS = ['Active', 'Checked', 'Resolved'];
-
 export default function StudentIncidentsPage() {
   const { user, isAdmin, isStudent } = useAuth();
 
-  // Current selected student (for Admin view) or logged-in student (for Student view)
+  // Selected student
   const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // States loaded dynamically from database table usr_incident_state
+  const [incidentStates, setIncidentStates] = useState([]);
 
   // Student search state (Admin)
   const [studentSearch, setStudentSearch] = useState('');
@@ -30,8 +31,7 @@ export default function StudentIncidentsPage() {
   const [loading, setLoading] = useState(false);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL' | 'Active' | 'Checked' | 'Resolved'
-  const [severityFilter, setSeverityFilter] = useState('ALL');
+  const [stateFilter, setStateFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals state
@@ -40,20 +40,41 @@ export default function StudentIncidentsPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  // Active / selected incident for View / Edit / Delete
+  // Active incident for View / Edit / Delete
   const [activeIncident, setActiveIncident] = useState(null);
 
-  // Form states
+  // Form states strictly matching usr_student_incident:
+  // note (varchar(500)), incident_state_id (tinyint), datetime (datetime)
   const [formData, setFormData] = useState({
     note: '',
-    severity: 'Medium',
-    status: 'Active',
+    incident_state_id: '',
     datetime: '',
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  // Set logged-in student as selected student on mount if student role
+  // 1. Fetch available incident states from usr_incident_state
+  const fetchIncidentStates = useCallback(async () => {
+    try {
+      const res = await getIncidentStates();
+      const data = res.data?.data ?? res.data ?? [];
+      const list = Array.isArray(data) ? data : [];
+      setIncidentStates(list);
+    } catch (e) {
+      console.error('Failed to load incident states:', e);
+      setIncidentStates([
+        { id: 1, name: 'Active' },
+        { id: 2, name: 'Checked' },
+        { id: 3, name: 'Resolved' },
+      ]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchIncidentStates();
+  }, [fetchIncidentStates]);
+
+  // Set logged-in student as selected student if role is STUDENT
   useEffect(() => {
     if (isStudent && user) {
       const studentId = user.id || user.userId || user.user_id;
@@ -68,7 +89,7 @@ export default function StudentIncidentsPage() {
     }
   }, [isStudent, user]);
 
-  // Fetch incidents for the selected student
+  // 2. Fetch incidents for selected student from usr_student_incident
   const fetchIncidents = useCallback(async () => {
     if (!selectedStudent?.id) {
       setIncidents([]);
@@ -78,8 +99,8 @@ export default function StudentIncidentsPage() {
     setLoading(true);
     try {
       const params = {};
-      if (statusFilter !== 'ALL') {
-        params.status = statusFilter;
+      if (stateFilter !== 'ALL') {
+        params.incident_state_id = stateFilter;
       }
 
       const res = await getStudentIncidents(selectedStudent.id, params);
@@ -93,13 +114,13 @@ export default function StudentIncidentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedStudent, statusFilter]);
+  }, [selectedStudent, stateFilter]);
 
   useEffect(() => {
     fetchIncidents();
   }, [fetchIncidents]);
 
-  // Admin student live search
+  // Search students (Admin)
   const handleSearchStudents = async (query) => {
     setStudentSearch(query);
     if (!query.trim()) {
@@ -141,7 +162,6 @@ export default function StudentIncidentsPage() {
     setIsSearchDropdownOpen(false);
   };
 
-  // Helper to format date for datetime-local input (YYYY-MM-DDTHH:mm)
   const toLocalISOString = (dateStr) => {
     const d = dateStr ? new Date(dateStr) : new Date();
     if (isNaN(d.getTime())) return '';
@@ -149,40 +169,35 @@ export default function StudentIncidentsPage() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  // Open Create Modal
   const openCreateModal = () => {
     if (!selectedStudent?.id) {
       toast.error('Please select a student first.');
       return;
     }
+    const defaultStateId = incidentStates.length > 0 ? incidentStates[0].id : 1;
     setFormData({
       note: '',
-      severity: 'Medium',
-      status: 'Active',
+      incident_state_id: defaultStateId,
       datetime: toLocalISOString(),
     });
     setFormErrors({});
     setIsCreateModalOpen(true);
   };
 
-  // Open Edit Modal
   const openEditModal = (incident) => {
     setActiveIncident(incident);
     setFormData({
       note: incident.note || '',
-      severity: incident.severity || 'Medium',
-      status: incident.status || 'Active',
+      incident_state_id: incident.incident_state_id ?? (incidentStates[0]?.id || 1),
       datetime: toLocalISOString(incident.datetime || incident.created_at),
     });
     setFormErrors({});
     setIsEditModalOpen(true);
   };
 
-  // Open Details Modal
   const openDetailModal = async (incident) => {
     setActiveIncident(incident);
     setIsDetailModalOpen(true);
-    // Fetch full details if needed
     try {
       const res = await getStudentIncidentById(incident.id);
       const detail = res.data?.data || res.data;
@@ -190,33 +205,33 @@ export default function StudentIncidentsPage() {
         setActiveIncident(detail);
       }
     } catch {
-      // Fallback to current incident object
+      // Fallback
     }
   };
 
-  // Open Delete Modal
   const openDeleteModal = (incident) => {
     setActiveIncident(incident);
     setIsDeleteModalOpen(true);
   };
 
-  // Validate form
   const validateForm = () => {
     const errs = {};
-    if (!formData.note.trim()) {
-      errs.note = 'Incident note / description is required.';
+    const noteTrimmed = (formData.note || '').trim();
+
+    if (!noteTrimmed) {
+      errs.note = 'Incident note is required.';
+    } else if (noteTrimmed.length > 500) {
+      errs.note = `Note cannot exceed 500 characters (currently ${noteTrimmed.length} characters).`;
     }
-    if (!formData.severity) {
-      errs.severity = 'Severity is required.';
+
+    if (!formData.incident_state_id && formData.incident_state_id !== 0) {
+      errs.incident_state_id = 'Incident state is required.';
     }
-    if (!formData.status) {
-      errs.status = 'Status is required.';
-    }
+
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  // Submit Create Incident
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -225,23 +240,21 @@ export default function StudentIncidentsPage() {
     try {
       const payload = {
         note: formData.note.trim(),
-        severity: formData.severity,
-        status: formData.status,
+        incident_state_id: Number(formData.incident_state_id),
         datetime: formData.datetime ? formData.datetime.replace('T', ' ') + ':00' : null,
       };
 
       await createStudentIncident(selectedStudent.id, payload);
-      toast.success('Incident reported successfully!');
+      toast.success('Incident recorded successfully!');
       setIsCreateModalOpen(false);
       fetchIncidents();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to report incident');
+      toast.error(err.response?.data?.message || 'Failed to record incident');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Submit Edit Incident
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -250,8 +263,7 @@ export default function StudentIncidentsPage() {
     try {
       const payload = {
         note: formData.note.trim(),
-        severity: formData.severity,
-        status: formData.status,
+        incident_state_id: Number(formData.incident_state_id),
         datetime: formData.datetime ? formData.datetime.replace('T', ' ') + ':00' : null,
       };
 
@@ -266,18 +278,16 @@ export default function StudentIncidentsPage() {
     }
   };
 
-  // Quick Status Update
-  const handleQuickStatusChange = async (incidentId, newStatus) => {
+  const handleQuickStateChange = async (incidentId, newStateId) => {
     try {
-      await updateStudentIncident(incidentId, { status: newStatus });
-      toast.success(`Status updated to ${newStatus}`);
+      await updateStudentIncident(incidentId, { incident_state_id: Number(newStateId) });
+      toast.success('State updated successfully');
       fetchIncidents();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update status');
+      toast.error(err.response?.data?.message || 'Failed to update state');
     }
   };
 
-  // Submit Delete Incident
   const handleDeleteSubmit = async () => {
     if (!activeIncident?.id) return;
     setSubmitting(true);
@@ -293,14 +303,8 @@ export default function StudentIncidentsPage() {
     }
   };
 
-  // Filtered incidents based on severity and text search
   const filteredIncidents = useMemo(() => {
     return incidents.filter((item) => {
-      // Severity filter
-      if (severityFilter !== 'ALL' && item.severity?.toLowerCase() !== severityFilter.toLowerCase()) {
-        return false;
-      }
-      // Note / keyword filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const noteMatch = (item.note || '').toLowerCase().includes(query);
@@ -309,62 +313,24 @@ export default function StudentIncidentsPage() {
       }
       return true;
     });
-  }, [incidents, severityFilter, searchQuery]);
+  }, [incidents, searchQuery]);
 
-  // Counts for tabs
-  const counts = useMemo(() => {
-    return {
-      all: incidents.length,
-      active: incidents.filter((i) => (i.status || '').toLowerCase() === 'active').length,
-      checked: incidents.filter((i) => (i.status || '').toLowerCase() === 'checked').length,
-      resolved: incidents.filter((i) => (i.status || '').toLowerCase() === 'resolved').length,
-    };
-  }, [incidents]);
+  const renderStateBadge = (stateId, stateName) => {
+    const name = stateName || incidentStates.find((s) => s.id === Number(stateId))?.name || `State #${stateId}`;
+    const lower = name.toLowerCase();
+    let badgeClass = 'badge-primary';
 
-  // Severity badge helper
-  const renderSeverityBadge = (severity) => {
-    const s = (severity || '').toLowerCase();
-    let badgeClass = 'badge-gray';
-    let icon = 'ℹ️';
-
-    if (s === 'critical') {
-      badgeClass = 'badge-danger';
-      icon = '🚨';
-    } else if (s === 'high') {
-      badgeClass = 'badge-danger';
-      icon = '⚠️';
-    } else if (s === 'medium') {
-      badgeClass = 'badge-warning';
-      icon = '⚡';
-    } else if (s === 'low') {
-      badgeClass = 'badge-primary';
-      icon = '🟢';
-    }
-
-    return (
-      <span className={`badge ${badgeClass}`} style={{ fontWeight: 600, padding: '4px 10px' }}>
-        <span style={{ fontSize: '11px', marginRight: '4px' }}>{icon}</span>
-        {severity || 'Unknown'}
-      </span>
-    );
-  };
-
-  // Status badge helper
-  const renderStatusBadge = (status) => {
-    const st = (status || '').toLowerCase();
-    let badgeClass = 'badge-gray';
-
-    if (st === 'resolved') {
+    if (lower.includes('resolve') || lower.includes('done') || lower.includes('close')) {
       badgeClass = 'badge-success';
-    } else if (st === 'checked') {
+    } else if (lower.includes('check') || lower.includes('investigat')) {
       badgeClass = 'badge-primary';
-    } else if (st === 'active') {
+    } else if (lower.includes('active') || lower.includes('open') || lower.includes('pend')) {
       badgeClass = 'badge-warning';
     }
 
     return (
       <span className={`badge ${badgeClass}`} style={{ fontWeight: 600, padding: '4px 10px' }}>
-        {status || 'Unknown'}
+        {name}
       </span>
     );
   };
@@ -379,8 +345,8 @@ export default function StudentIncidentsPage() {
           </h1>
           <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
             {isAdmin
-              ? 'Log, inspect, and monitor student academic incidents, behavioral notes, and complaints.'
-              : 'View all incident reports recorded on your student profile.'}
+              ? 'Manage student academic and disciplinary incident reports in accordance with incident states.'
+              : 'Review your logged incident reports.'}
           </p>
         </div>
 
@@ -576,7 +542,7 @@ export default function StudentIncidentsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 600 }}>
-                    Recorded Incidents
+                    Active Incidents
                   </div>
                   <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--primary)' }}>
                     {incidents.length}
@@ -631,7 +597,7 @@ export default function StudentIncidentsPage() {
             No Student Selected
           </h3>
           <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto' }}>
-            Please use the search box above to choose a student. Once selected, their active incidents, notes, and report actions will be displayed here.
+            Please select a student using the search input above to inspect or report incidents.
           </p>
         </div>
       ) : (
@@ -656,83 +622,69 @@ export default function StudentIncidentsPage() {
               gap: '14px',
             }}
           >
-            {/* Status Pills */}
+            {/* Dynamic State Filter Pills from usr_incident_state */}
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {[
-                { key: 'ALL', label: 'All', count: counts.all },
-                { key: 'Active', label: 'Active', count: counts.active },
-                { key: 'Checked', label: 'Checked', count: counts.checked },
-                { key: 'Resolved', label: 'Resolved', count: counts.resolved },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setStatusFilter(tab.key)}
-                  className="btn btn-sm"
-                  style={{
-                    borderRadius: '20px',
-                    padding: '5px 12px',
-                    fontWeight: 600,
-                    fontSize: '12.5px',
-                    background: statusFilter === tab.key ? 'var(--primary)' : 'var(--bg)',
-                    color: statusFilter === tab.key ? 'white' : 'var(--text-secondary)',
-                    border: '1px solid',
-                    borderColor: statusFilter === tab.key ? 'var(--primary)' : 'var(--border)',
-                  }}
-                >
-                  {tab.label}{' '}
-                  <span
+              <button
+                onClick={() => setStateFilter('ALL')}
+                className="btn btn-sm"
+                style={{
+                  borderRadius: '20px',
+                  padding: '5px 12px',
+                  fontWeight: 600,
+                  fontSize: '12.5px',
+                  background: stateFilter === 'ALL' ? 'var(--primary)' : 'var(--bg)',
+                  color: stateFilter === 'ALL' ? 'white' : 'var(--text-secondary)',
+                  border: '1px solid',
+                  borderColor: stateFilter === 'ALL' ? 'var(--primary)' : 'var(--border)',
+                }}
+              >
+                All States ({incidents.length})
+              </button>
+              {incidentStates.map((st) => {
+                const count = incidents.filter((i) => Number(i.incident_state_id) === Number(st.id)).length;
+                return (
+                  <button
+                    key={st.id}
+                    onClick={() => setStateFilter(String(st.id))}
+                    className="btn btn-sm"
                     style={{
-                      marginLeft: '4px',
-                      opacity: 0.85,
-                      fontSize: '11px',
-                      background: statusFilter === tab.key ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.06)',
-                      padding: '1px 6px',
-                      borderRadius: '10px',
+                      borderRadius: '20px',
+                      padding: '5px 12px',
+                      fontWeight: 600,
+                      fontSize: '12.5px',
+                      background: stateFilter === String(st.id) ? 'var(--primary)' : 'var(--bg)',
+                      color: stateFilter === String(st.id) ? 'white' : 'var(--text-secondary)',
+                      border: '1px solid',
+                      borderColor: stateFilter === String(st.id) ? 'var(--primary)' : 'var(--border)',
                     }}
                   >
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
+                    {st.name} <span style={{ opacity: 0.8, fontSize: '11px' }}>({count})</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Severity Filter & Search input */}
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <select
+            {/* Keyword Search */}
+            <div style={{ position: 'relative', width: '240px' }}>
+              <input
+                type="text"
                 className="form-control"
-                style={{ width: 'auto', minWidth: '135px', height: '36px', fontSize: '13px' }}
-                value={severityFilter}
-                onChange={(e) => setSeverityFilter(e.target.value)}
+                placeholder="Search in note..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{ height: '36px', fontSize: '13px', paddingLeft: '32px' }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)',
+                }}
               >
-                <option value="ALL">All Severities</option>
-                {SEVERITY_OPTIONS.map((sev) => (
-                  <option key={sev} value={sev}>
-                    {sev} Severity
-                  </option>
-                ))}
-              </select>
-
-              <div style={{ position: 'relative', width: '220px' }}>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Search in note..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ height: '36px', fontSize: '13px', paddingLeft: '32px' }}
-                />
-                <span
-                  style={{
-                    position: 'absolute',
-                    left: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                  }}
-                >
-                  🔍
-                </span>
-              </div>
+                🔍
+              </span>
             </div>
           </div>
 
@@ -745,14 +697,14 @@ export default function StudentIncidentsPage() {
               </div>
             ) : filteredIncidents.length === 0 ? (
               <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: '36px', marginBottom: '10px' }}>🎉</div>
+                <div style={{ fontSize: '36px', marginBottom: '10px' }}>📋</div>
                 <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
                   No Incidents Found
                 </h4>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  {statusFilter !== 'ALL' || severityFilter !== 'ALL' || searchQuery
+                  {stateFilter !== 'ALL' || searchQuery
                     ? 'No incidents match the active filter criteria.'
-                    : 'This student has a clean record with no reported incidents.'}
+                    : 'No incidents recorded for this student.'}
                 </p>
                 {isAdmin && (
                   <button
@@ -768,10 +720,10 @@ export default function StudentIncidentsPage() {
               <table>
                 <thead>
                   <tr>
-                    <th style={{ width: '130px' }}>Date & Time</th>
-                    <th style={{ width: '110px' }}>Severity</th>
-                    <th style={{ width: '110px' }}>Status</th>
+                    <th style={{ width: '160px' }}>Incident Date</th>
+                    <th style={{ width: '140px' }}>Incident State</th>
                     <th>Incident Note</th>
+                    <th style={{ width: '140px' }}>Reported By</th>
                     <th style={{ width: '160px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
@@ -785,41 +737,29 @@ export default function StudentIncidentsPage() {
                         <td style={{ fontSize: '12.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           {dateFormatted}
                         </td>
-                        <td>{renderSeverityBadge(incident.severity)}</td>
                         <td>
                           {isAdmin ? (
                             <select
-                              value={incident.status || 'Active'}
-                              onChange={(e) => handleQuickStatusChange(incident.id, e.target.value)}
+                              value={incident.incident_state_id ?? (incidentStates[0]?.id || 1)}
+                              onChange={(e) => handleQuickStateChange(incident.id, e.target.value)}
                               style={{
                                 fontSize: '11.5px',
                                 fontWeight: 600,
                                 padding: '3px 8px',
                                 borderRadius: '14px',
                                 border: '1px solid var(--border)',
-                                background:
-                                  (incident.status || '').toLowerCase() === 'resolved'
-                                    ? 'var(--secondary-light)'
-                                    : (incident.status || '').toLowerCase() === 'checked'
-                                    ? 'var(--primary-light)'
-                                    : 'var(--warning-light)',
-                                color:
-                                  (incident.status || '').toLowerCase() === 'resolved'
-                                    ? '#03543f'
-                                    : (incident.status || '').toLowerCase() === 'checked'
-                                    ? 'var(--primary-dark)'
-                                    : 'var(--warning)',
                                 cursor: 'pointer',
+                                background: 'var(--bg)',
                               }}
                             >
-                              {STATUS_OPTIONS.map((st) => (
-                                <option key={st} value={st}>
-                                  {st}
+                              {incidentStates.map((st) => (
+                                <option key={st.id} value={st.id}>
+                                  {st.name}
                                 </option>
                               ))}
                             </select>
                           ) : (
-                            renderStatusBadge(incident.status)
+                            renderStateBadge(incident.incident_state_id, incident.incident_state_name)
                           )}
                         </td>
                         <td>
@@ -836,6 +776,9 @@ export default function StudentIncidentsPage() {
                           >
                             {incident.note}
                           </div>
+                        </td>
+                        <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          {incident.reported_by_username || (incident.reported_by ? incident.reported_by.substring(0, 8) + '...' : 'System')}
                         </td>
                         <td style={{ textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px' }}>
@@ -876,7 +819,7 @@ export default function StudentIncidentsPage() {
         </div>
       )}
 
-      {/* CREATE INCIDENT MODAL */}
+      {/* CREATE INCIDENT MODAL (Strictly usr_student_incident fields) */}
       {isCreateModalOpen && (
         <div className="modal-overlay" onClick={() => !submitting && setIsCreateModalOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -910,57 +853,44 @@ export default function StudentIncidentsPage() {
                   <span className="badge badge-primary">{selectedStudent?.academicId || 'ID'}</span>
                 </div>
 
-                {/* Note Field */}
+                {/* Note Field (Max 500 chars as in varchar(500)) */}
                 <div className="form-group">
-                  <label className="form-label">
-                    Incident Description / Note <span>*</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Incident Description / Note <span>*</span>
+                    </label>
+                    <span style={{ fontSize: '11px', color: (formData.note || '').length > 450 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                      {(formData.note || '').length} / 500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
+                    maxLength={500}
                     className={`form-control ${formErrors.note ? 'error' : ''}`}
-                    placeholder="Provide specific, factual details about the student incident or issue..."
+                    placeholder="Enter factual incident details (maximum 500 characters)..."
                     value={formData.note}
                     onChange={(e) => setFormData({ ...formData, note: e.target.value })}
                   />
                   {formErrors.note && <div className="form-error">{formErrors.note}</div>}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  {/* Severity */}
-                  <div className="form-group">
-                    <label className="form-label">
-                      Severity <span>*</span>
-                    </label>
-                    <select
-                      className="form-control"
-                      value={formData.severity}
-                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                    >
-                      {SEVERITY_OPTIONS.map((sev) => (
-                        <option key={sev} value={sev}>
-                          {sev}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Status */}
-                  <div className="form-group">
-                    <label className="form-label">
-                      Initial Status <span>*</span>
-                    </label>
-                    <select
-                      className="form-control"
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      {STATUS_OPTIONS.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {/* Incident State from usr_incident_state */}
+                <div className="form-group">
+                  <label className="form-label">
+                    Incident State <span>*</span>
+                  </label>
+                  <select
+                    className="form-control"
+                    value={formData.incident_state_id}
+                    onChange={(e) => setFormData({ ...formData, incident_state_id: Number(e.target.value) })}
+                  >
+                    {incidentStates.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} (ID: {st.id})
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.incident_state_id && <div className="form-error">{formErrors.incident_state_id}</div>}
                 </div>
 
                 {/* Incident Datetime */}
@@ -972,7 +902,7 @@ export default function StudentIncidentsPage() {
                     value={formData.datetime}
                     onChange={(e) => setFormData({ ...formData, datetime: e.target.value })}
                   />
-                  <div className="form-hint">Defaults to current time if left as is.</div>
+                  <div className="form-hint">Defaults to current time if left unchanged.</div>
                 </div>
               </div>
               <div className="modal-footer">
@@ -1009,13 +939,19 @@ export default function StudentIncidentsPage() {
             </div>
             <form onSubmit={handleEditSubmit}>
               <div className="modal-body">
-                {/* Note Field */}
+                {/* Note Field (Max 500 chars) */}
                 <div className="form-group">
-                  <label className="form-label">
-                    Incident Description / Note <span>*</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Incident Description / Note <span>*</span>
+                    </label>
+                    <span style={{ fontSize: '11px', color: (formData.note || '').length > 450 ? 'var(--danger)' : 'var(--text-muted)' }}>
+                      {(formData.note || '').length} / 500
+                    </span>
+                  </div>
                   <textarea
                     rows={4}
+                    maxLength={500}
                     className={`form-control ${formErrors.note ? 'error' : ''}`}
                     value={formData.note}
                     onChange={(e) => setFormData({ ...formData, note: e.target.value })}
@@ -1023,38 +959,20 @@ export default function StudentIncidentsPage() {
                   {formErrors.note && <div className="form-error">{formErrors.note}</div>}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  {/* Severity */}
-                  <div className="form-group">
-                    <label className="form-label">Severity</label>
-                    <select
-                      className="form-control"
-                      value={formData.severity}
-                      onChange={(e) => setFormData({ ...formData, severity: e.target.value })}
-                    >
-                      {SEVERITY_OPTIONS.map((sev) => (
-                        <option key={sev} value={sev}>
-                          {sev}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Status */}
-                  <div className="form-group">
-                    <label className="form-label">Status</label>
-                    <select
-                      className="form-control"
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      {STATUS_OPTIONS.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {/* State */}
+                <div className="form-group">
+                  <label className="form-label">Incident State</label>
+                  <select
+                    className="form-control"
+                    value={formData.incident_state_id}
+                    onChange={(e) => setFormData({ ...formData, incident_state_id: Number(e.target.value) })}
+                  >
+                    {incidentStates.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} (ID: {st.id})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Incident Datetime */}
@@ -1110,16 +1028,15 @@ export default function StudentIncidentsPage() {
               >
                 <div>
                   <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>
-                    Status & Severity
+                    Incident State
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                    {renderStatusBadge(activeIncident.status)}
-                    {renderSeverityBadge(activeIncident.severity)}
+                  <div style={{ marginTop: '4px' }}>
+                    {renderStateBadge(activeIncident.incident_state_id, activeIncident.incident_state_name)}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', fontWeight: 700 }}>
-                    Date Recorded
+                    Incident Date
                   </div>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
                     {new Date(activeIncident.datetime || activeIncident.created_at).toLocaleString()}
@@ -1148,19 +1065,25 @@ export default function StudentIncidentsPage() {
                 </div>
               </div>
 
-              {/* Metadata */}
+              {/* Database Schema Metadata */}
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Incident ID: </span>
+                    <span style={{ color: 'var(--text-muted)' }}>ID: </span>
                     <span style={{ fontFamily: 'monospace' }}>{activeIncident.id}</span>
                   </div>
-                  {activeIncident.student_fname && (
-                    <div>
-                      <span style={{ color: 'var(--text-muted)' }}>Student: </span>
-                      {activeIncident.student_fname} {activeIncident.student_lname}
-                    </div>
-                  )}
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Student User ID: </span>
+                    <span style={{ fontFamily: 'monospace' }}>{activeIncident.student_user_id}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Reported By: </span>
+                    <span>{activeIncident.reported_by_username || activeIncident.reported_by}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>State ID: </span>
+                    <span>{activeIncident.incident_state_id}</span>
+                  </div>
                   {activeIncident.created_at && (
                     <div>
                       <span style={{ color: 'var(--text-muted)' }}>Created At: </span>
@@ -1220,11 +1143,11 @@ export default function StudentIncidentsPage() {
                     Are you sure you want to delete this incident?
                   </div>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    This action will permanently delete this incident report for{' '}
+                    This incident record will be soft deleted from{' '}
                     <strong>
                       {selectedStudent?.fname} {selectedStudent?.lname}
                     </strong>
-                    . This action cannot be reversed.
+                    's history.
                   </p>
                 </div>
               </div>
@@ -1242,7 +1165,7 @@ export default function StudentIncidentsPage() {
                 onClick={handleDeleteSubmit}
                 disabled={submitting}
               >
-                {submitting ? 'Deleting...' : 'Yes, Delete Incident'}
+                {submitting ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>
           </div>
@@ -1251,4 +1174,3 @@ export default function StudentIncidentsPage() {
     </div>
   );
 }
-
