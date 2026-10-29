@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getAdminCourses, getStudents, createManualEnrollment } from "../api";
+import { getAdminCourses, getStudents, createManualEnrollment, removeEnrollment } from "../api";
 import toast from "react-hot-toast";
 
 export default function ManualEnrollmentPage() {
@@ -30,6 +30,39 @@ export default function ManualEnrollmentPage() {
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [resultModal, setResultModal] = useState(null);
+
+  // Remove enrollment state
+  const [removeIdInput, setRemoveIdInput] = useState("");
+  const [removingId, setRemovingId] = useState(false);
+
+  const handleDirectRemove = async (idToRemove) => {
+    const id = idToRemove || removeIdInput.trim();
+    if (!id) {
+      toast.error("Please enter an Enrollment ID.");
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to remove enrollment ${id}? The student will lose course access.`)) {
+      return;
+    }
+
+    setRemovingId(true);
+    try {
+      const res = await removeEnrollment(id);
+      toast.success(res.data?.message || "Student removed from course successfully.");
+      setRemoveIdInput("");
+      if (resultModal?.enrolled) {
+        setResultModal((prev) => ({
+          ...prev,
+          enrolled: prev.enrolled.filter((e) => e.enrollmentId !== id),
+        }));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to remove enrollment.");
+    } finally {
+      setRemovingId(false);
+    }
+  };
 
   // Fetch active courses on load
   useEffect(() => {
@@ -686,6 +719,38 @@ export default function ManualEnrollmentPage() {
               </button>
             </div>
           </div>
+
+          {/* Remove Enrollment by ID Card */}
+          <div className="card" style={{ marginTop: "16px" }}>
+            <div className="card-header">
+              <span className="card-title" style={{ fontSize: "14px", color: "var(--danger)" }}>
+                Drop / Remove Enrollment
+              </span>
+            </div>
+            <div className="card-body" style={{ padding: "16px" }}>
+              <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "10px" }}>
+                Remove an active enrollment record by ID (Calls <code>PATCH /api/enrollment/remove</code>).
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Enter Enrollment UUID..."
+                  value={removeIdInput}
+                  onChange={(e) => setRemoveIdInput(e.target.value)}
+                  style={{ fontSize: "12.5px", fontFamily: "monospace" }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  disabled={removingId || !removeIdInput.trim()}
+                  onClick={() => handleDirectRemove()}
+                >
+                  {removingId ? "Removing..." : "Remove Student from Course"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -743,9 +808,21 @@ export default function ManualEnrollmentPage() {
                   </h4>
                   <div style={{ maxHeight: "120px", overflowY: "auto", border: "1px solid var(--border)", borderRadius: "6px", fontSize: "12px", padding: "8px 12px", background: "var(--bg)" }}>
                     {resultModal.enrolled.map((item, idx) => (
-                      <div key={idx} style={{ padding: "3px 0", display: "flex", justifyContent: "space-between" }}>
+                      <div key={idx} style={{ padding: "4px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <span>Student ID: <code style={{ fontWeight: 600 }}>{item.studentId}</code></span>
-                        <span style={{ color: "var(--text-muted)" }}>Enrollment: {item.enrollmentId?.slice(0, 8)}...</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "var(--text-muted)", fontSize: "11.5px" }}>ID: {item.enrollmentId?.slice(0, 8)}...</span>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            style={{ padding: "1px 6px", fontSize: "11px" }}
+                            title="Remove this enrollment"
+                            disabled={removingId}
+                            onClick={() => handleDirectRemove(item.enrollmentId)}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

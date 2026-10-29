@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -10,6 +10,7 @@ import CoursesPage from "./pages/CoursesPage";
 import PackagesPage from "./pages/PackagesPage";
 import LessonsPage from "./pages/LessonsPage";
 import EnrollPage from "./pages/EnrollPage";
+import EnrollmentCatalogPage from "./pages/EnrollmentCatalogPage";
 import CoursePaymentsPage from "./pages/CoursePaymentsPage";
 import PackagePaymentsPage from "./pages/PackagePaymentsPage";
 import LessonPaymentsPage from "./pages/LessonPaymentsPage";
@@ -17,6 +18,7 @@ import CreatePackagePage from "./pages/CreatePackagePage";
 import PackageBuyPage from "./pages/PackageBuyPage";
 import InstitutesPage from "./pages/InstitutesPage";
 import TuteRequestsPage from "./pages/TuteRequestsPage";
+import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
 
 function App() {
   return (
@@ -46,6 +48,8 @@ function App() {
             }
           >
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/catalog" element={<EnrollmentCatalogPage />} />
+            <Route path="/enrollment-catalog" element={<EnrollmentCatalogPage />} />
             <Route path="/courses" element={<CoursesPage />} />
             <Route path="/packages" element={<PackagesPage />} />
             <Route path="/packages/:id/buy" element={<PackageBuyPage />} />
@@ -68,6 +72,14 @@ function App() {
               }
             />
             <Route path="/enroll" element={<EnrollPage />} />
+            <Route
+              path="/manual-enrollment"
+              element={
+                <ProtectedRoute adminOnly>
+                  <ManualEnrollmentPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/payments/course" element={<CoursePaymentsPage />} />
             <Route path="/payments/package" element={<PackagePaymentsPage />} />
             <Route path="/payments/lesson" element={<ProtectedRoute adminOnly><LessonPaymentsPage /></ProtectedRoute>} />

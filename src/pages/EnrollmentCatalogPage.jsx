@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   filterEnrollmentCourses,
   filterEnrollmentPackages,
-  getBatches
+  getBatches,
+  removeEnrollment
 } from "../api";
 import toast from "react-hot-toast";
 
@@ -39,6 +40,28 @@ export default function EnrollmentCatalogPage() {
   // Selected item for detail modal
   const [detailModalItem, setDetailModalItem] = useState(null);
   const [detailModalType, setDetailModalType] = useState(null); // 'course' | 'package'
+
+  // Remove enrollment state
+  const [confirmRemoveModal, setConfirmRemoveModal] = useState(null); // { enrollmentId, courseName }
+  const [removingEnrollmentId, setRemovingEnrollmentId] = useState(null);
+
+  const handleConfirmRemove = async () => {
+    if (!confirmRemoveModal?.enrollmentId) return;
+    setRemovingEnrollmentId(confirmRemoveModal.enrollmentId);
+    try {
+      const res = await removeEnrollment(confirmRemoveModal.enrollmentId);
+      toast.success(res.data?.message || "Student removed from course successfully.");
+      setConfirmRemoveModal(null);
+      if (detailModalItem?.enrollment?.id === confirmRemoveModal.enrollmentId) {
+        setDetailModalItem(null);
+      }
+      fetchCourses();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to remove enrollment.");
+    } finally {
+      setRemovingEnrollmentId(null);
+    }
+  };
 
   // Fetch batches on mount
   useEffect(() => {
@@ -531,12 +554,27 @@ export default function EnrollmentCatalogPage() {
                         </button>
 
                         {hasAccess ? (
-                          <button
-                            className="btn btn-success btn-sm"
-                            onClick={() => navigate(`/lessons?courseId=${course.id}`)}
-                          >
-                            Open
-                          </button>
+                          <>
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={() => navigate(`/lessons?courseId=${course.id}`)}
+                            >
+                              Open
+                            </button>
+                            {course.enrollment?.status === "ACTIVE" && course.enrollment?.id && (
+                              <button
+                                className="btn btn-danger btn-sm"
+                                title="Remove enrollment / Drop course"
+                                style={{ padding: "4px 8px", fontSize: "11px" }}
+                                onClick={() => setConfirmRemoveModal({
+                                  enrollmentId: course.enrollment.id,
+                                  courseName: course.name
+                                })}
+                              >
+                                Drop
+                              </button>
+                            )}
+                          </>
                         ) : (
                           <button
                             className="btn btn-primary btn-sm"
@@ -771,7 +809,30 @@ export default function EnrollmentCatalogPage() {
                 <div><strong>Start Date:</strong> {detailModalItem.start_date || "Open"}</div>
                 <div><strong>Course Access:</strong> {detailModalItem.course_access ? "✅ Granted" : "❌ Requires Enrollment"}</div>
                 {detailModalItem.enrollment && (
-                  <div><strong>Your Enrollment:</strong> {detailModalItem.enrollment.status}</div>
+                  <div>
+                    <strong>Your Enrollment:</strong>{" "}
+                    <span className={`badge ${detailModalItem.enrollment.status === "ACTIVE" ? "badge-success" : "badge-gray"}`}>
+                      {detailModalItem.enrollment.status}
+                    </span>
+                    {detailModalItem.enrollment.status === "ACTIVE" && detailModalItem.enrollment.id && (
+                      <div style={{ marginTop: "10px", padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontWeight: 600, color: "#991b1b" }}>Active Course Access</div>
+                          <div style={{ fontSize: "11.5px", color: "#b91c1c" }}>Enrollment ID: {detailModalItem.enrollment.id}</div>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => setConfirmRemoveModal({
+                            enrollmentId: detailModalItem.enrollment.id,
+                            courseName: detailModalItem.name
+                          })}
+                        >
+                          Remove Enrollment
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <div style={{ marginTop: "10px", fontSize: "16px", fontWeight: 700 }}>
                   Price: LKR {Number(detailModalItem.cropped_price || 0).toLocaleString()}
@@ -855,6 +916,53 @@ export default function EnrollmentCatalogPage() {
                   Proceed to Enroll Package
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Removing Enrollment */}
+      {confirmRemoveModal && (
+        <div className="modal-overlay" onClick={() => !removingEnrollmentId && setConfirmRemoveModal(null)}>
+          <div className="modal" style={{ maxWidth: "440px", width: "100%" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ color: "var(--danger)" }}>Remove from Course</h3>
+              <button
+                className="modal-close"
+                onClick={() => setConfirmRemoveModal(null)}
+                disabled={Boolean(removingEnrollmentId)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body" style={{ fontSize: "13.5px" }}>
+              <p style={{ marginBottom: "12px" }}>
+                Are you sure you want to remove the enrollment for <strong>{confirmRemoveModal.courseName || "this course"}</strong>?
+              </p>
+              <p style={{ color: "var(--text-secondary)", fontSize: "12px" }}>
+                Enrollment ID: <code>{confirmRemoveModal.enrollmentId}</code>
+              </p>
+              <div style={{ marginTop: "12px", padding: "10px", background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: "6px", fontSize: "12px", color: "#c2410c" }}>
+                ⚠️ This will mark the enrollment as <strong>REMOVED</strong> and remove active student access.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setConfirmRemoveModal(null)}
+                disabled={Boolean(removingEnrollmentId)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleConfirmRemove}
+                disabled={Boolean(removingEnrollmentId)}
+              >
+                {removingEnrollmentId ? "Removing..." : "Confirm Removal"}
+              </button>
             </div>
           </div>
         </div>

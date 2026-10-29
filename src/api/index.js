@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 const api = axios.create({
   baseURL: '',
@@ -99,6 +99,7 @@ export const getAllLessons = (params) => api.get('/api/lessons/all', { params })
 
 // Enrollment
 export const enrollCourse = (data) => api.post('/api/enroll/course', data);
+export const enrollCourseFree = (data) => api.post('/api/enroll/course/free', data);
 export const enrollPackage = (data) => api.post('/api/enroll/package', data);
 export const enrollLesson = (data) => api.post('/api/enroll/lesson', data);
 export const updateEnrollment = (data) => api.post('/api/enroll/update', data);
@@ -106,6 +107,7 @@ export const updateCourseEnrollment = (data) => api.put('/api/enroll/update/cour
 export const updatePackageEnrollment = (data) => api.put('/api/enroll/update/package', data);
 export const updateLessonEnrollment = (data) => api.put('/api/enroll/update/lesson', data);
 export const cancelEnrollment = (data) => api.post('/api/enroll/cancel', data);
+export const removeEnrollment = (enrollmentId) => api.patch('/api/enrollment/remove', { enrollmentId });
 export const getEnrollDetails = (id) => api.get('/api/enroll', { params: { id } });
 
 // Course Requests (admin)
@@ -151,3 +153,16 @@ export const updateTuteRequest = (id, data) => api.put('/api/academic/tute-reque
 export const updateTuteRequestStatus = (id, status) => api.put('/api/academic/tute-request/' + id + '/status', { status });
 export const deleteTuteRequest = (id) => api.delete('/api/academic/tute-request/' + id);
 export const getTuteRequestsForPrint = (params) => api.get('/api/academic/tute-requests/print', { params });
+
+// Enrollment Catalog & Filter
+export const filterEnrollmentCourses = (params) => api.get('/api/student/courses/filter', { params });
+export const filterEnrollmentPackages = (params) => api.get('/api/student/packages/filter', { params });
+
+// Product Enrollment Details
+export const getCourseEnrollmentProduct = (id) => api.get('/api/student/enroll/course/' + id);
+export const getPackageEnrollmentProduct = (data) => api.post('/api/student/enroll/package', data);
+
+// Manual Enrollment (Admin)
+export const createManualEnrollment = (data) => api.post('/api/manual/enrollments', data);
+export const getStudents = (params) => api.get('/api/user/students/filter', { params });
+
