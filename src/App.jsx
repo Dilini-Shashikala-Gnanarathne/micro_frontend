@@ -17,6 +17,7 @@ import LessonPaymentsPage from "./pages/LessonPaymentsPage";
 import CreatePackagePage from "./pages/CreatePackagePage";
 import PackageBuyPage from "./pages/PackageBuyPage";
 import InstitutesPage from "./pages/InstitutesPage";
+import ModulesPage from "./pages/ModulesPage";
 import TuteRequestsPage from "./pages/TuteRequestsPage";
 import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
 
@@ -62,6 +63,14 @@ function App() {
               }
             />
             <Route path="/lessons" element={<LessonsPage />} />
+            <Route
+              path="/modules"
+              element={
+                <ProtectedRoute adminOnly>
+                  <ModulesPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/institutes" element={<InstitutesPage />} />
             <Route
               path="/tute-requests"

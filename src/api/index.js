@@ -68,6 +68,12 @@ export const getCourses = (params) => {
 export const getStudentCourses = (params) => api.get('/api/student/courses/filter', { params });
 export const getAdminCourses = (params) => api.get('/api/courses/filter', { params });
 export const getCourseById = (id) => api.get(`/api/course/${id}`);
+export const createCourse = (formData) => api.post('/api/aca/course', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const updateCourse = (data) => api.put('/api/aca/course', data);
+export const updateCourseStatus = (id, status) => api.put('/api/course/status', { id, status });
+export const deleteCourse = (id) => api.delete(`/api/course/${id}`);
 
 // Packages (Auto-selects Admin vs Student endpoint according to user role)
 export const getPackages = (params) => {
@@ -165,4 +171,11 @@ export const getPackageEnrollmentProduct = (data) => api.post('/api/student/enro
 // Manual Enrollment (Admin)
 export const createManualEnrollment = (data) => api.post('/api/manual/enrollments', data);
 export const getStudents = (params) => api.get('/api/user/students/filter', { params });
+
+// Academic Modules (Admin)
+export const getModules = (params) => api.get('/api/academic/modules/filter', { params });
+export const createModule = (data) => api.post('/api/academic/module', data);
+export const updateModule = (id, data) => api.put(`/api/academic/module/${id}`, data);
+export const deleteModule = (id) => api.delete(`/api/academic/module/${id}`);
+
 
