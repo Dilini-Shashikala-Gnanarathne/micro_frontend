@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getCourseRequests, approvePayment, rejectPayment, getRejectReasons } from "../api";
 import toast from "react-hot-toast";
@@ -22,6 +22,7 @@ export default function CoursePaymentsPage() {
   // Filters
   const [filters, setFilters] = useState({
     keyword: "",
+    status: "",
     paymentStatus: "",
     paymentMethod: "",
     page: 1,
@@ -42,6 +43,7 @@ export default function CoursePaymentsPage() {
     try {
       const params = {
         keyword: filters.keyword || undefined,
+        status: filters.status || undefined,
         paymentStatus: filters.paymentStatus || undefined,
         paymentMethod: filters.paymentMethod || undefined,
         page: filters.page,
@@ -71,7 +73,7 @@ export default function CoursePaymentsPage() {
   useEffect(() => {
     fetchRequests();
     loadRejectReasons();
-  }, [filters.page, filters.paymentStatus, filters.paymentMethod]);
+  }, [filters.page, filters.status, filters.paymentStatus, filters.paymentMethod]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -82,6 +84,7 @@ export default function CoursePaymentsPage() {
   const handleReset = () => {
     setFilters({
       keyword: "",
+      status: "",
       paymentStatus: "",
       paymentMethod: "",
       page: 1,
@@ -192,6 +195,20 @@ export default function CoursePaymentsPage() {
 
             <select
               className="form-control"
+              value={filters.status}
+              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value, page: 1 }))}
+              style={{ width: "auto" }}
+              id="filter-enrollment-status"
+            >
+              <option value="">All Enrollment Status</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PENDING">Pending</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+
+            <select
+              className="form-control"
               value={filters.paymentMethod}
               onChange={(e) => setFilters((f) => ({ ...f, paymentMethod: e.target.value, page: 1 }))}
               style={{ width: "auto" }}
@@ -238,21 +255,27 @@ export default function CoursePaymentsPage() {
               </thead>
               <tbody>
                 {requests.map((req) => {
-                  const studentName = `${req.student?.fname || ""} ${req.student?.lname || ""}`.trim() || req.student?.username || "Student";
+                  const studentName = `${req.student?.firstName || req.student?.fname || ""} ${req.student?.lastName || req.student?.lname || ""}`.trim() || req.student?.username || "Student";
+                  const academicId = req.student?.academicId || req.student?.academic_id;
+                  const mobile = req.student?.mobile || req.student?.student_mobile;
                   const courseName = req.course?.name || req.course?.code || "-";
                   const payment = req.payment;
                   const order = req.order;
                   const evidence = payment?.evidence;
-                  const slipUrl = evidence?.file_url;
+                  const slipUrl = evidence?.fileUrl || evidence?.file_url;
+                  const orderNo = order?.ordernumber || order?.order_no || "-";
+                  const totalAmt = payment?.amount ?? order?.totalAmount ?? order?.total ?? order?.final_amount ?? 0;
+                  const pMethod = payment?.paymentMethod || payment?.payment_method || req.paymentMethod || "DIGITAL";
+                  const refNo = evidence?.referenceNo || evidence?.reference_no || payment?.referenceNo || payment?.reference_no || "-";
                   const isPending = payment?.status === "WAITING_APPROVAL" || payment?.status === "PENDING";
 
                   return (
-                    <tr key={req.enrollmentId || req.orderId || Math.random()}>
+                    <tr key={req.enrollmentId || req.course?.enrollment?.enrollmentId || req.orderId || order?.id || Math.random()}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{studentName}</div>
                         <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "2px" }}>
-                          {req.student?.academic_id && <span style={{ marginRight: "6px" }}>{req.student.academic_id}</span>}
-                          {req.student?.mobile && <span>{req.student.mobile}</span>}
+                          {academicId && <span style={{ marginRight: "6px" }}>ID: {academicId}</span>}
+                          {mobile && <span>{mobile}</span>}
                         </div>
                       </td>
                       <td>
@@ -263,18 +286,18 @@ export default function CoursePaymentsPage() {
                       </td>
                       <td>
                         <div style={{ fontWeight: 700 }}>
-                          LKR {Number(payment?.amount || order?.final_amount || 0).toLocaleString()}
+                          LKR {Number(totalAmt).toLocaleString()}
                         </div>
                         <div style={{ fontSize: "11.5px", color: "var(--text-muted)" }}>
-                          {order?.order_no || "-"}
+                          {orderNo}
                         </div>
                       </td>
                       <td>
                         <span className="badge badge-primary" style={{ fontSize: "11px" }}>
-                          {payment?.payment_method || req.paymentMethod || "DIGITAL"}
+                          {pMethod}
                         </span>
                         <div style={{ fontSize: "11.5px", color: "var(--text-muted)", marginTop: "3px", fontFamily: "monospace" }}>
-                          {evidence?.reference_no || payment?.reference_no || "-"}
+                          {refNo}
                         </div>
                       </td>
                       <td>
@@ -402,7 +425,7 @@ export default function CoursePaymentsPage() {
               <div style={{ background: "var(--bg)", padding: "14px", borderRadius: "var(--radius-sm)", fontSize: "13px" }}>
                 <div className="flex justify-between mb-2">
                   <span className="text-muted">Student:</span>
-                  <strong>{selectedReq.student?.fname} {selectedReq.student?.lname}</strong>
+                  <strong>{selectedReq.student?.firstName || selectedReq.student?.fname} {selectedReq.student?.lastName || selectedReq.student?.lname}</strong>
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="text-muted">Course:</span>
@@ -411,12 +434,12 @@ export default function CoursePaymentsPage() {
                 <div className="flex justify-between mb-2">
                   <span className="text-muted">Amount:</span>
                   <strong style={{ color: "var(--primary)" }}>
-                    LKR {Number(selectedReq.payment?.amount || selectedReq.order?.final_amount || 0).toLocaleString()}
+                    LKR {Number(selectedReq.payment?.amount || selectedReq.order?.totalAmount || selectedReq.order?.total || selectedReq.order?.final_amount || 0).toLocaleString()}
                   </strong>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Reference:</span>
-                  <span style={{ fontFamily: "monospace" }}>{selectedReq.payment?.reference_no || "-"}</span>
+                  <span style={{ fontFamily: "monospace" }}>{selectedReq.payment?.referenceNo || selectedReq.payment?.reference_no || "-"}</span>
                 </div>
               </div>
             </div>
@@ -502,7 +525,7 @@ export default function CoursePaymentsPage() {
       )}
 
       {/* SLIP PREVIEW MODAL */}
-      {modalType === "slip" && selectedReq?.payment?.evidence?.file_url && (
+      {modalType === "slip" && (selectedReq?.payment?.evidence?.fileUrl || selectedReq?.payment?.evidence?.file_url) && (
         <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModalType("")}>
           <div className="modal" style={{ maxWidth: "560px" }}>
             <div className="modal-header">
@@ -511,17 +534,17 @@ export default function CoursePaymentsPage() {
             </div>
             <div className="modal-body" style={{ textAlign: "center", background: "#111827", padding: "16px", borderRadius: "var(--radius-sm)" }}>
               <img
-                src={resolveMediaUrl(selectedReq.payment.evidence.file_url)}
+                src={resolveMediaUrl(selectedReq.payment.evidence.fileUrl || selectedReq.payment.evidence.file_url)}
                 alt="Bank Slip"
                 style={{ maxWidth: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: "4px" }}
               />
             </div>
             <div className="modal-footer flex justify-between">
               <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
-                Ref: <strong>{selectedReq.payment?.evidence?.reference_no || "-"}</strong>
+                Ref: <strong>{selectedReq.payment?.evidence?.referenceNo || selectedReq.payment?.evidence?.reference_no || "-"}</strong>
               </span>
               <a
-                href={resolveMediaUrl(selectedReq.payment.evidence.file_url)}
+                href={resolveMediaUrl(selectedReq.payment.evidence.fileUrl || selectedReq.payment.evidence.file_url)}
                 target="_blank"
                 rel="noreferrer"
                 className="btn btn-secondary btn-sm"

@@ -166,7 +166,20 @@ export const filterEnrollmentPackages = (params) => api.get('/api/student/packag
 
 // Product Enrollment Details
 export const getCourseEnrollmentProduct = (id) => api.get('/api/student/enroll/course/' + id);
-export const getPackageEnrollmentProduct = (data) => api.post('/api/student/enroll/package', data);
+export const getPackageEnrollmentProduct = (packageIdOrData, courseIds = []) => {
+  if (typeof packageIdOrData === 'object' && packageIdOrData !== null) {
+    const pkgId = packageIdOrData.packageId || packageIdOrData.package_id;
+    const crsIds = packageIdOrData.courseIds || packageIdOrData.course_ids || [];
+    return api.post('/api/student/enroll/package', {
+      packageId: pkgId,
+      courseIds: crsIds,
+    });
+  }
+  return api.post('/api/student/enroll/package', {
+    packageId: packageIdOrData,
+    courseIds: Array.isArray(courseIds) ? courseIds : [],
+  });
+};
 
 // Manual Enrollment (Admin)
 export const createManualEnrollment = (data) => api.post('/api/manual/enrollments', data);

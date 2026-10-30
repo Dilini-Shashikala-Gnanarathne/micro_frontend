@@ -4,7 +4,8 @@ import {
   filterEnrollmentCourses,
   filterEnrollmentPackages,
   getBatches,
-  removeEnrollment
+  removeEnrollment,
+  getPackageEnrollmentProduct
 } from "../api";
 import toast from "react-hot-toast";
 
@@ -40,6 +41,29 @@ export default function EnrollmentCatalogPage() {
   // Selected item for detail modal
   const [detailModalItem, setDetailModalItem] = useState(null);
   const [detailModalType, setDetailModalType] = useState(null); // 'course' | 'package'
+  const [packageEnrollmentDetails, setPackageEnrollmentDetails] = useState(null);
+  const [loadingPackageDetails, setLoadingPackageDetails] = useState(false);
+
+  // Fetch live package enrollment status via POST /api/student/enroll/package
+  useEffect(() => {
+    if (detailModalType === "package" && detailModalItem?.id) {
+      setLoadingPackageDetails(true);
+      setPackageEnrollmentDetails(null);
+      getPackageEnrollmentProduct(detailModalItem.id, [])
+        .then((res) => {
+          const data = res.data?.data || res.data;
+          setPackageEnrollmentDetails(data);
+        })
+        .catch((err) => {
+          console.warn("Failed to load real-time package enrollment details:", err);
+        })
+        .finally(() => {
+          setLoadingPackageDetails(false);
+        });
+    } else {
+      setPackageEnrollmentDetails(null);
+    }
+  }, [detailModalItem, detailModalType]);
 
   // Remove enrollment state
   const [confirmRemoveModal, setConfirmRemoveModal] = useState(null); // { enrollmentId, courseName }
@@ -841,55 +865,122 @@ export default function EnrollmentCatalogPage() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px" }}>
-                <div><strong>Medium:</strong> {detailModalItem.medium}</div>
-                <div><strong>Batch:</strong> {detailModalItem.batch?.name || "N/A"}</div>
-                <div><strong>Starting Price:</strong> LKR {Number(detailModalItem.price_start_from || 0).toLocaleString()}</div>
-
-                <div>
-                  <strong>Courses in this package ({detailModalItem.courses?.length || 0}):</strong>
-                  <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {detailModalItem.courses?.map((c) => (
-                      <div key={c.id} style={{ background: "#f8fafc", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                        <div style={{ fontWeight: 700, color: "#1e293b" }}>{c.code} - {c.name}</div>
-                        <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "2px" }}>
-                          Type: {c.course_type} | Medium: {c.medium} {c.has_tute ? "| Tute Included" : ""}
+                {loadingPackageDetails ? (
+                  <div style={{ padding: "30px", textAlign: "center", color: "var(--text-secondary)" }}>
+                    <div className="spinner" style={{ margin: "0 auto 10px auto" }} />
+                    <div>Loading live student access & pricing details...</div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                      <div>
+                        <div><strong>Medium:</strong> {packageEnrollmentDetails?.medium || detailModalItem.medium}</div>
+                        <div><strong>Batch:</strong> {packageEnrollmentDetails?.batch?.name || detailModalItem.batch?.name || "General Batch"}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>
+                          Calculated Total Price
                         </div>
-                        {c.parent_course && (
-                          <div style={{ fontSize: "11px", color: "#475569", marginTop: "2px" }}>
-                            Parent: {c.parent_course.name} ({c.parent_course.code})
-                          </div>
-                        )}
-                        <div style={{ fontSize: "11.5px", marginTop: "4px", fontWeight: 600, color: c.course_access ? "#10b981" : "#64748b" }}>
-                          Access: {c.course_access ? "Granted" : "Not Enrolled"}
+                        <div style={{ fontSize: "18px", fontWeight: 800, color: (packageEnrollmentDetails?.is_free || Number(packageEnrollmentDetails?.price) === 0) ? "#10b981" : "var(--primary)" }}>
+                          {(packageEnrollmentDetails?.is_free || Number(packageEnrollmentDetails?.price) === 0)
+                            ? "FREE"
+                            : `LKR ${Number(packageEnrollmentDetails ? packageEnrollmentDetails.price : detailModalItem.price_start_from || 0).toLocaleString()}`}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                {detailModalItem.combinations && detailModalItem.combinations.length > 0 && (
-                  <div>
-                    <strong>Available Combinations:</strong>
-                    <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {detailModalItem.combinations.map((comb, i) => (
-                        <div key={i} style={{ background: "#f1f5f9", padding: "10px", borderRadius: "8px" }}>
-                          <div style={{ fontWeight: 700, fontSize: "12px", marginBottom: "4px" }}>Combination #{i + 1}</div>
-                          {comb.courses.map((cr, j) => (
-                            <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                              <span>Course ID: {cr.id}</span>
-                              <span>
-                                {cr.is_free ? (
-                                  <span style={{ color: "#10b981", fontWeight: 700 }}>FREE (Enrolled/Included)</span>
+                    {(packageEnrollmentDetails?.is_free || Number(packageEnrollmentDetails?.price) === 0) && (
+                      <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px 14px", borderRadius: "8px", color: "#065f46", fontSize: "12.5px", fontWeight: 600 }}>
+                        🎉 You have full free access or are active in all courses in this package!
+                      </div>
+                    )}
+
+                    <div>
+                      <strong>Courses in this package ({(packageEnrollmentDetails?.courses || detailModalItem.courses)?.length || 0}):</strong>
+                      <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(packageEnrollmentDetails?.courses || detailModalItem.courses)?.map((c) => (
+                          <div key={c.id} style={{ background: "#ffffff", padding: "12px", borderRadius: "8px", border: `1.5px solid ${c.course_access ? "#10b981" : "#e2e8f0"}` }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "6px" }}>
+                              <div>
+                                <span style={{ fontWeight: 800, color: "#1e293b", marginRight: "6px" }}>{c.code}</span>
+                                <span style={{ fontWeight: 600, color: "#334155" }}>{c.name}</span>
+                              </div>
+                              <div>
+                                {c.course_access ? (
+                                  <span className="badge badge-success" style={{ fontSize: "10.5px", fontWeight: 700 }}>
+                                    ✓ Access Granted
+                                  </span>
+                                ) : c.enrollment?.status ? (
+                                  <span className="badge badge-info" style={{ fontSize: "10.5px" }}>
+                                    {c.enrollment.status}
+                                  </span>
                                 ) : (
-                                  `LKR ${Number(cr.price).toLocaleString()}`
+                                  <span className="badge badge-gray" style={{ fontSize: "10.5px" }}>
+                                    Not Enrolled
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ fontSize: "11.5px", color: "#64748b", marginTop: "6px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                              <span>Type: {c.course_type}</span>
+                              <span>Medium: {c.medium}</span>
+                              {c.expiry_date && <span>📅 Expiry: {c.expiry_date}</span>}
+                              {c.has_tute && <span>📦 Tute Available</span>}
+                              {c.parent_course && (
+                                <span style={{ color: "#4f46e5", fontWeight: 600 }}>
+                                  🔗 Covered by Parent: {c.parent_course.name}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {packageEnrollmentDetails?.seleted_combinations && packageEnrollmentDetails.seleted_combinations.length > 0 ? (
+                      <div>
+                        <strong>Selected Combination Price Breakdown:</strong>
+                        <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {packageEnrollmentDetails.seleted_combinations.map((comb, i) => (
+                            <div key={i} style={{ background: "#f8fafc", padding: "8px 12px", borderRadius: "6px", border: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                              <span>Item #{i + 1}</span>
+                              <span>
+                                {comb.is_free ? (
+                                  <span style={{ color: "#10b981", fontWeight: 700 }}>FREE (Active / Included)</span>
+                                ) : (
+                                  `LKR ${Number(comb.price).toLocaleString()}`
                                 )}
                               </span>
                             </div>
                           ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    ) : detailModalItem.combinations && detailModalItem.combinations.length > 0 ? (
+                      <div>
+                        <strong>Available Combinations:</strong>
+                        <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {detailModalItem.combinations.map((comb, i) => (
+                            <div key={i} style={{ background: "#f1f5f9", padding: "10px", borderRadius: "8px" }}>
+                              <div style={{ fontWeight: 700, fontSize: "12px", marginBottom: "4px" }}>Combination #{i + 1}</div>
+                              {comb.courses.map((cr, j) => (
+                                <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
+                                  <span>Course ID: {cr.id}</span>
+                                  <span>
+                                    {cr.is_free ? (
+                                      <span style={{ color: "#10b981", fontWeight: 700 }}>FREE (Enrolled/Included)</span>
+                                    ) : (
+                                      `LKR ${Number(cr.price).toLocaleString()}`
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             )}

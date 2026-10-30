@@ -1,6 +1,13 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPackageById, enrollPackage, uploadPaymentSlip, cancelEnrollment, getPhysicalInstitutes } from "../api";
+import {
+  getPackageById,
+  getPackageEnrollmentProduct,
+  enrollPackage,
+  uploadPaymentSlip,
+  cancelEnrollment,
+  getPhysicalInstitutes
+} from "../api";
 import toast from "react-hot-toast";
 
 const PAYMENT_METHODS = [
@@ -81,6 +88,10 @@ export default function PackageBuyPage() {
     }));
   };
 
+  // Live Enrollment Details from POST /api/student/enroll/package
+  const [enrollmentProduct, setEnrollmentProduct] = useState(null);
+  const [loadingProductDetails, setLoadingProductDetails] = useState(false);
+
   useEffect(() => {
     async function loadPackage() {
       setLoading(true);
@@ -102,6 +113,25 @@ export default function PackageBuyPage() {
       loadPackage();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !selectedComboId || !pkg) return;
+    const combo = pkg.combinations?.find((c) => c.id === selectedComboId);
+    const courseIds = combo?.items?.map((item) => item.courseId) || [];
+
+    setLoadingProductDetails(true);
+    getPackageEnrollmentProduct(id, courseIds)
+      .then((res) => {
+        const data = res.data?.data || res.data;
+        setEnrollmentProduct(data);
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch real-time package enrollment details:", err);
+      })
+      .finally(() => {
+        setLoadingProductDetails(false);
+      });
+  }, [id, selectedComboId, pkg]);
 
   const handleSlipChange = (e) => {
     const file = e.target.files?.[0];
@@ -167,11 +197,15 @@ export default function PackageBuyPage() {
       });
       toast.success(res.data?.message || "Package enrollment created successfully!");
 
-      // If DIGITAL: Move to step 2 to upload evidence
-      if (paymentMethod === "DIGITAL") {
+      // If DIGITAL and not free: Move to step 2 to upload evidence
+      const isFree = Boolean(
+        enrollmentProduct?.is_free ||
+        (enrollmentProduct?.price !== undefined && Number(enrollmentProduct?.price) <= 0)
+      );
+      if (paymentMethod === "DIGITAL" && !isFree) {
         setStep(2);
       } else {
-        // ONLINE, MANUAL, PAY_LATER: Move straight to completion
+        // ONLINE, MANUAL, PAY_LATER, or FREE: Move straight to completion
         setStep(3);
       }
     } catch (err) {
@@ -524,6 +558,140 @@ export default function PackageBuyPage() {
             </div>
           </div>
 
+          {/* Real-time Student Access & Pricing Breakdown (POST /api/student/enroll/package) */}
+          {enrollmentProduct && (
+            <div className="card mb-4" style={{ border: "1.5px solid #3b82f6", background: "#f8fafc" }}>
+              <div
+                className="card-header"
+                style={{
+                  background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
+                  color: "white",
+                  padding: "14px 18px",
+                  borderRadius: "8px 8px 0 0",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "white", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>⚡</span> Live Student Course Access & Price Breakdown
+                  </h2>
+                  <p style={{ fontSize: "11.5px", margin: "2px 0 0 0", opacity: 0.9 }}>
+                    Calculated dynamically for your account via <code style={{ color: "#fef08a" }}>POST /api/student/enroll/package</code>
+                  </p>
+                </div>
+                {loadingProductDetails && (
+                  <span className="spinner" style={{ width: 16, height: 16, borderColor: "white transparent white transparent" }} />
+                )}
+              </div>
+
+              <div className="card-body" style={{ padding: "16px" }}>
+                {(enrollmentProduct.is_free || Number(enrollmentProduct.price) === 0) ? (
+                  <div
+                    style={{
+                      background: "#ecfdf5",
+                      border: "1px solid #a7f3d0",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      color: "#065f46",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      marginBottom: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <span>🎉</span>
+                    <span>All selected courses are entitled to FREE access or already active! No payment required.</span>
+                  </div>
+                ) : null}
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {enrollmentProduct.courses?.map((c) => {
+                    const comboItem = enrollmentProduct.seleted_combinations?.find((sc) => sc.id === c.id);
+                    const isItemFree = Boolean(comboItem?.is_free || c.course_access);
+
+                    return (
+                      <div
+                        key={c.id}
+                        style={{
+                          background: "white",
+                          border: `1.5px solid ${c.course_access ? "#10b981" : "#e2e8f0"}`,
+                          borderRadius: "8px",
+                          padding: "12px 14px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: "10px",
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span style={{ fontWeight: 800, fontSize: "13px", color: "#1e293b" }}>
+                              {c.code}
+                            </span>
+                            <span style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
+                              {c.name}
+                            </span>
+                            {c.course_access ? (
+                              <span className="badge badge-success" style={{ fontSize: "10.5px", fontWeight: 700 }}>
+                                ✓ Access Granted
+                              </span>
+                            ) : c.enrollment?.status ? (
+                              <span className="badge badge-info" style={{ fontSize: "10.5px" }}>
+                                {c.enrollment.status}
+                              </span>
+                            ) : (
+                              <span className="badge badge-gray" style={{ fontSize: "10.5px" }}>
+                                Not Enrolled
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11.5px", color: "#64748b", marginTop: "4px" }}>
+                            <span>Medium: {c.medium}</span>
+                            <span>Type: {c.course_type}</span>
+                            {c.expiry_date && <span>📅 Expiry: {c.expiry_date}</span>}
+                            {c.has_tute && <span>📦 Tute Available</span>}
+                            {c.parent_course && (
+                              <span style={{ color: "#4f46e5", fontWeight: 600 }}>
+                                🔗 Covered by Parent: {c.parent_course.name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: "right" }}>
+                          {isItemFree ? (
+                            <span style={{ color: "#10b981", fontWeight: 800, fontSize: "13px" }}>
+                              FREE (Active / Included)
+                            </span>
+                          ) : (
+                            <span style={{ fontWeight: 800, fontSize: "14px", color: "var(--primary)" }}>
+                              Rs. {Number(comboItem?.price || 0).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ borderTop: "1px dashed #cbd5e1", marginTop: "14px", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
+                    Total Calculated Amount for you:
+                  </span>
+                  <span style={{ fontSize: "18px", fontWeight: 800, color: (enrollmentProduct.is_free || Number(enrollmentProduct.price) === 0) ? "#10b981" : "var(--primary)" }}>
+                    {enrollmentProduct.is_free || Number(enrollmentProduct.price) === 0 ? "FREE" : `Rs. ${Number(enrollmentProduct.price).toLocaleString()}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Tute & Study Material Selection per Course */}
           {(() => {
             const comboCoursesWithTutes = selectedCombination?.items?.map((item) => {
@@ -721,14 +889,14 @@ export default function PackageBuyPage() {
                 <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
                   Selected Combo: <strong>Code {selectedCombination?.code || "-"}</strong>
                 </div>
-                <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--primary)" }}>
-                  Total: Rs. {selectedCombination?.totalPrice?.toLocaleString() || 0}
+                <div style={{ fontSize: "20px", fontWeight: 800, color: (enrollmentProduct?.is_free || Number(enrollmentProduct?.price) === 0) ? "#10b981" : "var(--primary)" }}>
+                  Total: {(enrollmentProduct?.is_free || Number(enrollmentProduct?.price) === 0) ? "FREE" : `Rs. ${(enrollmentProduct ? enrollmentProduct.price : selectedCombination?.totalPrice)?.toLocaleString() || 0}`}
                 </div>
               </div>
 
               <button
                 type="button"
-                className="btn btn-primary"
+                className={`btn ${(enrollmentProduct?.is_free || Number(enrollmentProduct?.price) === 0) ? "btn-success" : "btn-primary"}`}
                 style={{ padding: "10px 28px", fontSize: "14px", fontWeight: 700 }}
                 onClick={handleInitiateEnroll}
                 disabled={enrolling || !selectedComboId}
@@ -740,7 +908,9 @@ export default function PackageBuyPage() {
                     Initiating Enrollment...
                   </>
                 ) : (
-                  `Enroll in Combo ${selectedCombination?.code || ""}`
+                  (enrollmentProduct?.is_free || Number(enrollmentProduct?.price) === 0)
+                    ? `Claim Free Enrollment (Combo ${selectedCombination?.code || ""})`
+                    : `Enroll in Combo ${selectedCombination?.code || ""}`
                 )}
               </button>
             </div>

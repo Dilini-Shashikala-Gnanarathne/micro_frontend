@@ -23,6 +23,7 @@ export default function LessonPaymentsPage() {
   // Filters
   const [filters, setFilters] = useState({
     keyword: "",
+    status: "",
     paymentStatus: "",
     paymentMethod: "",
     page: 1,
@@ -43,6 +44,7 @@ export default function LessonPaymentsPage() {
     try {
       const params = {
         keyword: filters.keyword || undefined,
+        status: filters.status || undefined,
         paymentStatus: filters.paymentStatus || undefined,
         paymentMethod: filters.paymentMethod || undefined,
         page: filters.page,
@@ -72,7 +74,7 @@ export default function LessonPaymentsPage() {
   useEffect(() => {
     fetchRequests();
     loadRejectReasons();
-  }, [filters.page, filters.paymentStatus, filters.paymentMethod]);
+  }, [filters.page, filters.status, filters.paymentStatus, filters.paymentMethod]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -83,6 +85,7 @@ export default function LessonPaymentsPage() {
   const handleReset = () => {
     setFilters({
       keyword: "",
+      status: "",
       paymentStatus: "",
       paymentMethod: "",
       page: 1,
@@ -188,6 +191,20 @@ export default function LessonPaymentsPage() {
               <option value="WAITING_APPROVAL">Waiting Approval</option>
               <option value="PENDING">Pending</option>
               <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+
+            <select
+              className="form-control"
+              value={filters.status}
+              onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value, page: 1 }))}
+              style={{ width: "auto" }}
+              id="filter-lesson-enrollment-status"
+            >
+              <option value="">All Enrollment Status</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PENDING">Pending</option>
+              <option value="COMPLETED">Completed</option>
               <option value="REJECTED">Rejected</option>
             </select>
 

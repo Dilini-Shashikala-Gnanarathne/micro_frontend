@@ -8,6 +8,7 @@ import {
   getPackages,
   getLessons,
   enrollCourse,
+  enrollCourseFree,
   enrollPackage,
   enrollLesson,
   cancelEnrollment,
@@ -297,28 +298,44 @@ export default function EnrollPage() {
     setLoading(true);
     let payload = {};
     let endpoint = "";
+    const isFreeCourse = enrollType === "course" && selected && Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0);
 
     try {
       let res;
       if (enrollType === "course") {
-        endpoint = "POST /api/enroll/course";
-        payload = { courseId: selected.id, paymentMethod };
         const hasTute = isTuteAvailable(selected);
+        const tuteData = {};
         if (hasTute) {
-          payload.needTute = needTute;
+          tuteData.needTute = needTute;
           if (needTute) {
-            payload.needHomeDelivery = needHomeDelivery;
+            tuteData.needHomeDelivery = needHomeDelivery;
             if (!needHomeDelivery) {
               if (!deliveryInstituteId) {
                 toast.error("Please select a physical pickup institute for tute collection.");
                 setLoading(false);
                 return;
               }
-              payload.deliveryInstituteId = deliveryInstituteId;
+              tuteData.deliveryInstituteId = deliveryInstituteId;
             }
           }
         }
-        res = await enrollCourse(payload);
+
+        if (isFreeCourse) {
+          endpoint = "POST /api/enroll/course/free";
+          payload = {
+            courseId: selected.id,
+            ...tuteData,
+          };
+          res = await enrollCourseFree(payload);
+        } else {
+          endpoint = "POST /api/enroll/course";
+          payload = {
+            courseId: selected.id,
+            paymentMethod,
+            ...tuteData,
+          };
+          res = await enrollCourse(payload);
+        }
       } else if (enrollType === "package") {
         endpoint = "POST /api/enroll/package";
         payload = {
@@ -344,9 +361,11 @@ export default function EnrollPage() {
         responsePayload: res.data,
         timestamp: new Date().toLocaleTimeString(),
       });
-      toast.success(res.data?.message || "Enrollment processed successfully!");
+      toast.success(res.data?.message || (isFreeCourse ? "Free course enrollment processed successfully!" : "Enrollment processed successfully!"));
 
-      if (paymentMethod === "DIGITAL") {
+      if (isFreeCourse) {
+        setStep(4); // Instant completion for free courses (no slip required)
+      } else if (paymentMethod === "DIGITAL") {
         setStep(3); // Go to slip upload step
       } else {
         setStep(4); // Instant completion for ONLINE, MANUAL, PAY_LATER
@@ -767,51 +786,68 @@ export default function EnrollPage() {
                 )
               )}
 
-              {PAYMENT_METHODS.map((m) => (
-                <div
-                  key={m.value}
-                  style={{
-                    border: `1.5px solid ${paymentMethod === m.value ? "var(--primary)" : "var(--border)"}`,
-                    borderRadius: "var(--radius-sm)",
-                    padding: "14px 16px",
-                    marginBottom: "10px",
-                    cursor: "pointer",
-                    background: paymentMethod === m.value ? "var(--primary-light)" : "white",
-                    transition: "all .2s",
-                    display: "flex",
-                    gap: "12px",
-                    alignItems: "center",
-                  }}
-                  onClick={() => setPaymentMethod(m.value)}
-                  id={`pm-${m.value.toLowerCase()}`}
-                >
-                  <div
-                    style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      border: `2px solid ${paymentMethod === m.value ? "var(--primary)" : "var(--border)"}`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {paymentMethod === m.value && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--primary)" }} />}
+              {enrollType === "course" && selected && Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0) ? (
+                <div style={{ background: "#ecfdf5", border: "1.5px solid #a7f3d0", padding: "16px", borderRadius: "var(--radius-sm)", marginBottom: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#065f46", fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>
+                    <span>🎉</span> 100% Free / Complimentary Course Enrollment
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontWeight: 600, fontSize: "13.5px" }}>{m.label}</span>
-                      <span className="badge badge-gray" style={{ fontSize: "11px" }}>{m.badge}</span>
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>{m.desc}</div>
+                  <div style={{ fontSize: "12.5px", color: "#047857" }}>
+                    No payment is required for this course. Click below to directly enroll via <code>POST /api/enroll/course/free</code>.
                   </div>
                 </div>
-              ))}
+              ) : (
+                PAYMENT_METHODS.map((m) => (
+                  <div
+                    key={m.value}
+                    style={{
+                      border: `1.5px solid ${paymentMethod === m.value ? "var(--primary)" : "var(--border)"}`,
+                      borderRadius: "var(--radius-sm)",
+                      padding: "14px 16px",
+                      marginBottom: "10px",
+                      cursor: "pointer",
+                      background: paymentMethod === m.value ? "var(--primary-light)" : "white",
+                      transition: "all .2s",
+                      display: "flex",
+                      gap: "12px",
+                      alignItems: "center",
+                    }}
+                    onClick={() => setPaymentMethod(m.value)}
+                    id={`pm-${m.value.toLowerCase()}`}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        border: `2px solid ${paymentMethod === m.value ? "var(--primary)" : "var(--border)"}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {paymentMethod === m.value && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--primary)" }} />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontWeight: 600, fontSize: "13.5px" }}>{m.label}</span>
+                        <span className="badge badge-gray" style={{ fontSize: "11px" }}>{m.badge}</span>
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>{m.desc}</div>
+                    </div>
+                  </div>
+                ))
+              )}
               <div style={{ marginTop: "20px", display: "flex", gap: "10px", justifyContent: "flex-end" }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)} id="btn-pm-back">Back</button>
                 <button className="btn btn-primary" onClick={handleEnroll} disabled={loading} id="btn-proceed-enroll">
-                  {loading ? <span className="spinner" /> : "Process Enrollment →"}
+                  {loading ? (
+                    <span className="spinner" />
+                  ) : (enrollType === "course" && selected && Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)) ? (
+                    "Complete Free Enrollment →"
+                  ) : (
+                    "Process Enrollment →"
+                  )}
                 </button>
               </div>
             </div>
