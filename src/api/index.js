@@ -180,6 +180,7 @@ export const getPackageEnrollmentProduct = (packageIdOrData, courseIds = []) => 
     courseIds: Array.isArray(courseIds) ? courseIds : [],
   });
 };
+export const getLessonsForEnroll = (params) => api.get('/api/lessons/enroll', { params });
 
 // Manual Enrollment (Admin)
 export const createManualEnrollment = (data) => api.post('/api/manual/enrollments', data);

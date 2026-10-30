@@ -5,14 +5,15 @@ import {
   filterEnrollmentPackages,
   getBatches,
   removeEnrollment,
-  getPackageEnrollmentProduct
+  getPackageEnrollmentProduct,
+  getLessonsForEnroll
 } from "../api";
 import toast from "react-hot-toast";
 
 export default function EnrollmentCatalogPage() {
   const navigate = useNavigate();
 
-  // Active Tab: 'courses' | 'packages'
+  // Active Tab: 'courses' | 'packages' | 'lessons'
   const [activeTab, setActiveTab] = useState("courses");
   const [loading, setLoading] = useState(false);
 
@@ -34,13 +35,26 @@ export default function EnrollmentCatalogPage() {
     batch_id: "",
   });
 
+  // Lesson Filters
+  const [lessonFilters, setLessonFilters] = useState({
+    name: "",
+    date: "",
+    sortBy: "request_at",
+    sortDir: "DESC",
+    page: 1,
+    size: 12,
+  });
+
   // Data
   const [courses, setCourses] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [lessons, setLessons] = useState([]);
+  const [lessonsTotal, setLessonsTotal] = useState(0);
+  const [lessonsTotalPages, setLessonsTotalPages] = useState(1);
 
   // Selected item for detail modal
   const [detailModalItem, setDetailModalItem] = useState(null);
-  const [detailModalType, setDetailModalType] = useState(null); // 'course' | 'package'
+  const [detailModalType, setDetailModalType] = useState(null); // 'course' | 'package' | 'lesson'
   const [packageEnrollmentDetails, setPackageEnrollmentDetails] = useState(null);
   const [loadingPackageDetails, setLoadingPackageDetails] = useState(false);
 
@@ -139,14 +153,59 @@ export default function EnrollmentCatalogPage() {
     }
   };
 
+  // Fetch Lessons
+  const fetchLessons = async () => {
+    setLoading(true);
+    try {
+      const params = {
+        page: lessonFilters.page,
+        size: lessonFilters.size,
+        sortBy: lessonFilters.sortBy,
+        sortDir: lessonFilters.sortDir,
+      };
+      if (lessonFilters.name?.trim()) params.name = lessonFilters.name.trim();
+      if (lessonFilters.date) params.date = lessonFilters.date;
+
+      const res = await getLessonsForEnroll(params);
+      const payload = res.data?.data || res.data || {};
+      const list = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+        ? payload
+        : payload.items || [];
+      setLessons(list);
+      const total = payload.totalCount ?? list.length;
+      setLessonsTotal(total);
+      setLessonsTotalPages(payload.totalPages || Math.ceil(total / lessonFilters.size) || 1);
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to load lessons for enrollment");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Trigger search on tab change or filter update
   useEffect(() => {
     if (activeTab === "courses") {
       fetchCourses();
-    } else {
+    } else if (activeTab === "packages") {
       fetchPackages();
+    } else if (activeTab === "lessons") {
+      fetchLessons();
     }
-  }, [activeTab, courseFilters.course_type, courseFilters.medium, courseFilters.batch_id, packageFilters.medium, packageFilters.batch_id]);
+  }, [
+    activeTab,
+    courseFilters.course_type,
+    courseFilters.medium,
+    courseFilters.batch_id,
+    packageFilters.medium,
+    packageFilters.batch_id,
+    lessonFilters.page,
+    lessonFilters.size,
+    lessonFilters.sortBy,
+    lessonFilters.sortDir,
+  ]);
 
   const handleCourseSearchSubmit = (e) => {
     e.preventDefault();
@@ -156,6 +215,12 @@ export default function EnrollmentCatalogPage() {
   const handlePackageSearchSubmit = (e) => {
     e.preventDefault();
     fetchPackages();
+  };
+
+  const handleLessonSearchSubmit = (e) => {
+    e.preventDefault();
+    setLessonFilters((f) => ({ ...f, page: 1 }));
+    fetchLessons();
   };
 
   // Helper for Cloudflare / local thumbnail image
@@ -198,7 +263,7 @@ export default function EnrollmentCatalogPage() {
         </div>
 
         {/* Tab Switcher */}
-        <div style={{ display: "flex", gap: "12px", marginTop: "22px" }}>
+        <div style={{ display: "flex", gap: "12px", marginTop: "22px", flexWrap: "wrap" }}>
           <button
             onClick={() => setActiveTab("courses")}
             style={{
@@ -232,6 +297,23 @@ export default function EnrollmentCatalogPage() {
             }}
           >
             📦 Packages ({packages.length})
+          </button>
+          <button
+            onClick={() => setActiveTab("lessons")}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              fontWeight: 700,
+              fontSize: "13.5px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              background: activeTab === "lessons" ? "#ffffff" : "rgba(255, 255, 255, 0.2)",
+              color: activeTab === "lessons" ? "#1e3a8a" : "#ffffff",
+              boxShadow: activeTab === "lessons" ? "0 4px 12px rgba(0,0,0,0.15)" : "none"
+            }}
+          >
+            🎬 Lessons ({lessonsTotal})
           </button>
         </div>
       </div>
@@ -329,7 +411,7 @@ export default function EnrollmentCatalogPage() {
               </button>
             </div>
           </form>
-        ) : (
+        ) : activeTab === "packages" ? (
           <form onSubmit={handlePackageSearchSubmit} style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "flex-end" }}>
             {/* Search Input for Package */}
             <div style={{ flex: "1 1 260px", minWidth: "240px" }}>
@@ -396,6 +478,108 @@ export default function EnrollmentCatalogPage() {
                 onClick={() => {
                   setPackageFilters({ search: "", medium: "all", batch_id: "" });
                   fetchPackages();
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={handleLessonSearchSubmit} style={{ display: "flex", flexWrap: "wrap", gap: "14px", alignItems: "flex-end" }}>
+            {/* Search Input for Lesson Name */}
+            <div style={{ flex: "1 1 240px", minWidth: "220px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+                Lesson Name
+              </label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Search by lesson name..."
+                  value={lessonFilters.name}
+                  onChange={(e) => setLessonFilters(f => ({ ...f, name: e.target.value }))}
+                  style={{ width: "100%", paddingLeft: "34px" }}
+                />
+                <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}>🔍</span>
+              </div>
+            </div>
+
+            {/* Date Filter */}
+            <div style={{ flex: "0 1 180px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+                Lesson Date
+              </label>
+              <input
+                type="date"
+                className="form-control"
+                value={lessonFilters.date}
+                onChange={(e) => setLessonFilters(f => ({ ...f, date: e.target.value, page: 1 }))}
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            {/* Sort By Filter */}
+            <div style={{ flex: "0 1 180px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+                Sort By
+              </label>
+              <select
+                className="form-control"
+                value={lessonFilters.sortBy}
+                onChange={(e) => setLessonFilters(f => ({ ...f, sortBy: e.target.value, page: 1 }))}
+                style={{ width: "100%" }}
+              >
+                <option value="request_at">Requested Date (Default)</option>
+                <option value="expires_at">Expiry Date</option>
+                <option value="name">Lesson Name</option>
+                <option value="date">Lesson Date</option>
+              </select>
+            </div>
+
+            {/* Sort Direction */}
+            <div style={{ flex: "0 1 140px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+                Order
+              </label>
+              <select
+                className="form-control"
+                value={lessonFilters.sortDir}
+                onChange={(e) => setLessonFilters(f => ({ ...f, sortDir: e.target.value, page: 1 }))}
+                style={{ width: "100%" }}
+              >
+                <option value="DESC">Descending (↓)</option>
+                <option value="ASC">Ascending (↑)</option>
+              </select>
+            </div>
+
+            {/* Page Size */}
+            <div style={{ flex: "0 1 120px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+                Page Size
+              </label>
+              <select
+                className="form-control"
+                value={lessonFilters.size}
+                onChange={(e) => setLessonFilters(f => ({ ...f, size: Number(e.target.value), page: 1 }))}
+                style={{ width: "100%" }}
+              >
+                <option value={12}>12 / page</option>
+                <option value={24}>24 / page</option>
+                <option value={48}>48 / page</option>
+              </select>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button type="submit" className="btn btn-primary" style={{ padding: "9px 18px" }}>
+                Filter
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: "9px 14px" }}
+                onClick={() => {
+                  setLessonFilters({ name: "", date: "", sortBy: "request_at", sortDir: "DESC", page: 1, size: 12 });
                 }}
               >
                 Reset
@@ -616,7 +800,7 @@ export default function EnrollmentCatalogPage() {
             })}
           </div>
         )
-      ) : (
+      ) : activeTab === "packages" ? (
         /* PACKAGE GRID */
         packages.length === 0 ? (
           <div className="card" style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)" }}>
@@ -786,6 +970,218 @@ export default function EnrollmentCatalogPage() {
             })}
           </div>
         )
+      ) : (
+        /* LESSON GRID */
+        lessons.length === 0 ? (
+          <div className="card" style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)" }}>
+            <div style={{ fontSize: "36px", marginBottom: "12px" }}>📭</div>
+            <h3 style={{ fontWeight: 700, marginBottom: "6px" }}>No lessons matched your filter</h3>
+            <p style={{ fontSize: "13px" }}>Try searching for a different lesson name, picking another date, or clearing filters.</p>
+          </div>
+        ) : (
+          <div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "20px"
+            }}>
+              {lessons.map((lesson) => {
+                const hasAccess = Boolean(lesson.lesson_access?.has_access);
+                const accessStatus = lesson.lesson_access?.status;
+                const enrollment = lesson.enrollment;
+                const order = lesson.order;
+
+                return (
+                  <div
+                    key={lesson.id}
+                    className="card"
+                    style={{
+                      overflow: "hidden",
+                      borderRadius: "12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      transition: "transform 0.2s, box-shadow 0.2s",
+                      position: "relative",
+                      border: hasAccess ? "1.5px solid #10b981" : "1px solid var(--border)",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.04)"
+                    }}
+                  >
+                    {/* Header Banner */}
+                    <div style={{
+                      background: hasAccess ? "linear-gradient(135deg, #059669 0%, #10b981 100%)" : "linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)",
+                      color: "white",
+                      padding: "16px 18px",
+                      position: "relative"
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                          <span className="badge" style={{ background: "rgba(255,255,255,0.22)", color: "white", fontWeight: 700, fontSize: "10.5px" }}>
+                            🎬 LESSON
+                          </span>
+                          {lesson.medium && (
+                            <span className="badge" style={{ background: "rgba(255,255,255,0.22)", color: "white", fontWeight: 600, fontSize: "10.5px" }}>
+                              {lesson.medium}
+                            </span>
+                          )}
+                          {lesson.batch?.name && (
+                            <span className="badge" style={{ background: "rgba(255,255,255,0.22)", color: "white", fontWeight: 600, fontSize: "10.5px" }}>
+                              🎓 {lesson.batch.name}
+                            </span>
+                          )}
+                        </div>
+
+                        <div>
+                          {hasAccess ? (
+                            <span className="badge" style={{ fontWeight: 800, fontSize: "10.5px", background: "#ffffff", color: "#065f46" }}>
+                              ✓ Active Access
+                            </span>
+                          ) : accessStatus === "PENDING" ? (
+                            <span className="badge" style={{ fontWeight: 800, fontSize: "10.5px", background: "#fef3c7", color: "#92400e" }}>
+                              ⏳ Pending
+                            </span>
+                          ) : accessStatus === "NOT_PAID" ? (
+                            <span className="badge" style={{ fontWeight: 800, fontSize: "10.5px", background: "#fee2e2", color: "#991b1b" }}>
+                              ⚠️ Unpaid
+                            </span>
+                          ) : (
+                            <span className="badge" style={{ fontWeight: 600, fontSize: "10.5px", background: "rgba(255,255,255,0.2)", color: "white" }}>
+                              Not Enrolled
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <h3 style={{ fontSize: "16px", fontWeight: 800, margin: "10px 0 4px 0", color: "#ffffff", lineHeight: 1.3 }}>
+                        {lesson.name}
+                      </h3>
+                      <div style={{ fontSize: "12px", opacity: 0.9 }}>
+                        📅 {lesson.date ? new Date(lesson.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "Schedule Open"}
+                      </div>
+                    </div>
+
+                    {/* Card Body */}
+                    <div style={{ padding: "16px", flex: 1, display: "flex", flexDirection: "column" }}>
+                      {/* Enrollment & Expiry status info box */}
+                      {enrollment ? (
+                        <div style={{
+                          background: enrollment.status === "ACTIVE" ? "#ecfdf5" : "#eff6ff",
+                          border: `1px solid ${enrollment.status === "ACTIVE" ? "#a7f3d0" : "#bfdbfe"}`,
+                          borderRadius: "8px",
+                          padding: "10px 12px",
+                          fontSize: "12px",
+                          marginBottom: "12px",
+                          color: enrollment.status === "ACTIVE" ? "#065f46" : "#1e40af"
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, marginBottom: "4px" }}>
+                            <span>Enrollment: {enrollment.status}</span>
+                            {enrollment.id && <span style={{ fontSize: "11px", opacity: 0.8 }}>#{enrollment.id}</span>}
+                          </div>
+                          {enrollment.requested_at && (
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                              Requested: {new Date(enrollment.requested_at).toLocaleDateString()}
+                            </div>
+                          )}
+                          {enrollment.expires_at && (
+                            <div style={{ fontSize: "11px", fontWeight: 600, marginTop: "2px" }}>
+                              ⏳ Expires: {new Date(enrollment.expires_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{
+                          background: "#f8fafc",
+                          border: "1px dashed #cbd5e1",
+                          borderRadius: "8px",
+                          padding: "10px 12px",
+                          fontSize: "12px",
+                          color: "#64748b",
+                          marginBottom: "12px"
+                        }}>
+                          No enrollment recorded for this lesson.
+                        </div>
+                      )}
+
+                      {/* Order Info */}
+                      {order?.id && (
+                        <div style={{ fontSize: "11.5px", color: "var(--text-secondary)", marginBottom: "12px", display: "flex", justifyContent: "space-between" }}>
+                          <span>Order Reference:</span>
+                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>#{order.id}</span>
+                        </div>
+                      )}
+
+                      {/* Pricing & Footer Actions */}
+                      <div style={{ marginTop: "auto", paddingTop: "12px", borderTop: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: "11px", color: "var(--text-secondary)", textTransform: "uppercase", fontWeight: 600 }}>Lesson Fee</div>
+                          <div style={{ fontSize: "16px", fontWeight: 800, color: "var(--text-primary)" }}>
+                            {order?.unit_price ? (
+                              `LKR ${Number(order.unit_price).toLocaleString()}`
+                            ) : order?.final_amount ? (
+                              `LKR ${Number(order.final_amount).toLocaleString()}`
+                            ) : (
+                              <span style={{ color: "#10b981" }}>FREE / STANDARD</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              setDetailModalItem(lesson);
+                              setDetailModalType("lesson");
+                            }}
+                          >
+                            Details
+                          </button>
+
+                          {hasAccess ? (
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={() => navigate(`/lessons?id=${lesson.id}`)}
+                            >
+                              View
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => navigate(`/enroll?type=lesson&lessonIds=${lesson.id}`)}
+                            >
+                              Enroll
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination Bar */}
+            {lessonsTotalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", padding: "12px 16px", background: "#f8fafc", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={lessonFilters.page <= 1}
+                  onClick={() => setLessonFilters((f) => ({ ...f, page: f.page - 1 }))}
+                >
+                  ← Previous
+                </button>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                  Page {lessonFilters.page} of {lessonsTotalPages} ({lessonsTotal} lessons)
+                </span>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  disabled={lessonFilters.page >= lessonsTotalPages}
+                  onClick={() => setLessonFilters((f) => ({ ...f, page: f.page + 1 }))}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* DETAIL MODAL */}
@@ -804,7 +1200,7 @@ export default function EnrollmentCatalogPage() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
               <div>
                 <span className="badge badge-info" style={{ marginBottom: "6px" }}>
-                  {detailModalType === "course" ? detailModalItem.course_type : "PACKAGE DETAILS"}
+                  {detailModalType === "course" ? detailModalItem.course_type : detailModalType === "package" ? "PACKAGE DETAILS" : "LESSON DETAILS"}
                 </span>
                 <h2 style={{ fontSize: "18px", fontWeight: 800, margin: 0 }}>{detailModalItem.name}</h2>
               </div>
@@ -818,7 +1214,7 @@ export default function EnrollmentCatalogPage() {
             </div>
 
             <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "16px" }}>
-              {detailModalItem.description || "No full description provided."}
+              {detailModalItem.description || (detailModalType === "lesson" ? `Individual Lesson scheduled on ${detailModalItem.date || "open date"}.` : "No full description provided.")}
             </div>
 
             {detailModalType === "course" ? (
@@ -863,7 +1259,7 @@ export default function EnrollmentCatalogPage() {
                   Price: LKR {Number(detailModalItem.cropped_price || 0).toLocaleString()}
                 </div>
               </div>
-            ) : (
+            ) : detailModalType === "package" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px" }}>
                 {loadingPackageDetails ? (
                   <div style={{ padding: "30px", textAlign: "center", color: "var(--text-secondary)" }}>
@@ -983,6 +1379,56 @@ export default function EnrollmentCatalogPage() {
                   </>
                 )}
               </div>
+            ) : (
+              /* LESSON DETAILS MODAL */
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "13px" }}>
+                <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                  <div style={{ marginBottom: "6px" }}><strong>Lesson Name:</strong> {detailModalItem.name}</div>
+                  <div style={{ marginBottom: "6px" }}><strong>Date:</strong> {detailModalItem.date || "Open / Not scheduled"}</div>
+                  <div style={{ marginBottom: "6px" }}><strong>Course Medium:</strong> {detailModalItem.medium || "N/A"}</div>
+                  <div><strong>Course Batch:</strong> {detailModalItem.batch?.name || "N/A"}</div>
+                </div>
+
+                <div style={{
+                  background: detailModalItem.lesson_access?.has_access ? "#ecfdf5" : "#fef3c7",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  border: `1.5px solid ${detailModalItem.lesson_access?.has_access ? "#a7f3d0" : "#fde68a"}`
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: "14px", color: detailModalItem.lesson_access?.has_access ? "#065f46" : "#92400e", marginBottom: "4px" }}>
+                    Access Privilege: {detailModalItem.lesson_access?.has_access ? "✅ Granted (Active Access)" : "⚠️ Restricted Access"}
+                  </div>
+                  <div><strong>Access Status:</strong> <span className="badge" style={{ marginLeft: "4px" }}>{detailModalItem.lesson_access?.status || "NOT_ENROLLED"}</span></div>
+                </div>
+
+                {detailModalItem.enrollment ? (
+                  <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontWeight: 700, marginBottom: "8px", fontSize: "13.5px" }}>Enrollment Information:</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <div><strong>Enrollment ID:</strong> #{detailModalItem.enrollment.id}</div>
+                      <div><strong>Status:</strong> <span className={`badge ${detailModalItem.enrollment.status === "ACTIVE" ? "badge-success" : "badge-info"}`}>{detailModalItem.enrollment.status}</span></div>
+                      <div><strong>Requested At:</strong> {detailModalItem.enrollment.requested_at || "-"}</div>
+                      <div><strong>Approved At:</strong> {detailModalItem.enrollment.approved_at || "-"}</div>
+                      <div style={{ gridColumn: "1 / -1" }}><strong>Expires At:</strong> {detailModalItem.enrollment.expires_at || "No expiry set"}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px dashed #cbd5e1", color: "#64748b" }}>
+                    No prior enrollment request found for this lesson.
+                  </div>
+                )}
+
+                {detailModalItem.order && (
+                  <div style={{ background: "#ffffff", padding: "14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontWeight: 700, marginBottom: "8px", fontSize: "13.5px" }}>Order Details:</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      <div><strong>Order ID:</strong> #{detailModalItem.order.id}</div>
+                      <div><strong>Unit Price:</strong> LKR {Number(detailModalItem.order.unit_price || 0).toLocaleString()}</div>
+                      <div><strong>Final Amount:</strong> LKR {Number(detailModalItem.order.final_amount || 0).toLocaleString()}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
@@ -998,7 +1444,7 @@ export default function EnrollmentCatalogPage() {
                 >
                   Proceed to Enroll
                 </button>
-              ) : (
+              ) : detailModalType === "package" ? (
                 <button
                   className="btn btn-primary"
                   onClick={() => {
@@ -1007,6 +1453,26 @@ export default function EnrollmentCatalogPage() {
                 >
                   Proceed to Enroll Package
                 </button>
+              ) : (
+                detailModalItem.lesson_access?.has_access ? (
+                  <button
+                    className="btn btn-success"
+                    onClick={() => {
+                      navigate(`/lessons?id=${detailModalItem.id}`);
+                    }}
+                  >
+                    View Lesson
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      navigate(`/enroll?type=lesson&lessonIds=${detailModalItem.id}`);
+                    }}
+                  >
+                    Proceed to Enroll Lesson
+                  </button>
+                )
               )}
             </div>
           </div>

@@ -7,6 +7,7 @@ import {
   updateLessonEnrollment,
   getPackages,
   getLessons,
+  getLessonsForEnroll,
   enrollCourse,
   enrollCourseFree,
   enrollPackage,
@@ -208,13 +209,18 @@ export default function EnrollPage() {
     } else if (typeParam === "lesson") {
       setEnrollType("lesson");
       setLoading(true);
-      getLessons({ size: 100 })
+      getLessonsForEnroll({ size: 100 })
         .then((res) => {
-          const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
-          setItems(Array.isArray(list) ? list : []);
+          const payload = res.data?.data || res.data || {};
+          const list = Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+            ? payload
+            : payload.items || [];
+          setItems(list);
           if (lessonIdsParam) {
             const ids = lessonIdsParam.split(",").map((s) => s.trim());
-            const matched = (Array.isArray(list) ? list : []).filter((l) => ids.includes(l.id));
+            const matched = list.filter((l) => ids.includes(l.id));
             if (matched.length > 0) {
               setSelectedLessons(matched);
               setStep(2);
@@ -225,7 +231,15 @@ export default function EnrollPage() {
             setStep(1);
           }
         })
-        .catch((err) => toast.error(err.response?.data?.message || "Failed to load lessons"))
+        .catch((err) => {
+          console.warn("Fallback to getLessons", err);
+          getLessons({ size: 100 })
+            .then((res) => {
+              const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
+              setItems(Array.isArray(list) ? list : []);
+            })
+            .catch((e) => toast.error(e.response?.data?.message || "Failed to load lessons"));
+        })
         .finally(() => setLoading(false));
     }
   }, [searchParams]);
@@ -273,9 +287,20 @@ export default function EnrollPage() {
         const list = res.data?.data?.data || res.data?.data?.items || res.data?.data || [];
         setItems(Array.isArray(list) ? list : []);
       } else if (type === "lesson") {
-        const res = await getLessons({ size: 50 });
-        const list = res.data?.data?.data || res.data?.data?.items || res.data?.data || [];
-        setItems(Array.isArray(list) ? list : []);
+        try {
+          const res = await getLessonsForEnroll({ size: 50 });
+          const payload = res.data?.data || res.data || {};
+          const list = Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+            ? payload
+            : payload.items || [];
+          setItems(list);
+        } catch {
+          const res = await getLessons({ size: 50 });
+          const list = res.data?.data?.data || res.data?.data?.items || res.data?.data || [];
+          setItems(Array.isArray(list) ? list : []);
+        }
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load items");
@@ -608,28 +633,54 @@ export default function EnrollPage() {
                       <tr>
                         <th>Select</th>
                         <th>Lesson Name</th>
-                        <th>Course</th>
+                        <th>Medium</th>
+                        <th>Batch</th>
                         <th>Date</th>
-                        <th>Free</th>
+                        <th>Fee</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredItems.map((l) => (
-                        <tr key={l.id} onClick={() => handleItemSelect(l)} style={{ cursor: "pointer" }}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              readOnly
-                              checked={!!selectedLessons.find((s) => s.id === l.id)}
-                              id={`lesson-check-${l.id}`}
-                            />
-                          </td>
-                          <td style={{ fontWeight: 600 }}>{l.name}</td>
-                          <td>{l.courseName || "-"}</td>
-                          <td>{l.date ? new Date(l.date).toLocaleDateString() : "-"}</td>
-                          <td>{l.isFree ? <span className="badge badge-success">Free</span> : "-"}</td>
-                        </tr>
-                      ))}
+                      {filteredItems.map((l) => {
+                        const hasAccess = Boolean(l.lesson_access?.has_access);
+                        const accessStatus = l.lesson_access?.status || l.enrollment?.status;
+                        const feeDisplay = l.order?.unit_price
+                          ? `LKR ${Number(l.order.unit_price).toLocaleString()}`
+                          : l.order?.final_amount
+                          ? `LKR ${Number(l.order.final_amount).toLocaleString()}`
+                          : l.isFree
+                          ? "Free"
+                          : "-";
+
+                        return (
+                          <tr key={l.id} onClick={() => handleItemSelect(l)} style={{ cursor: "pointer" }}>
+                            <td>
+                              <input
+                                type="checkbox"
+                                readOnly
+                                checked={!!selectedLessons.find((s) => s.id === l.id)}
+                                id={`lesson-check-${l.id}`}
+                              />
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{l.name}</td>
+                            <td>{l.medium || l.courseMedium || "-"}</td>
+                            <td>{l.batch?.name || "-"}</td>
+                            <td>{l.date ? new Date(l.date).toLocaleDateString() : "-"}</td>
+                            <td style={{ fontWeight: 600 }}>{feeDisplay}</td>
+                            <td>
+                              {hasAccess ? (
+                                <span className="badge badge-success">✓ Active Access</span>
+                              ) : accessStatus === "PENDING" ? (
+                                <span className="badge" style={{ background: "#fef3c7", color: "#92400e" }}>⏳ Pending</span>
+                              ) : accessStatus === "NOT_PAID" ? (
+                                <span className="badge" style={{ background: "#fee2e2", color: "#991b1b" }}>⚠️ Unpaid</span>
+                              ) : (
+                                <span className="badge badge-gray">Not Enrolled</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   {selectedLessons.length > 0 && (
