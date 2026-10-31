@@ -102,6 +102,22 @@ export const getLessons = (params) => {
   return api.get('/api/lessons/all', { params });
 };
 export const getAllLessons = (params) => api.get('/api/lessons/all', { params });
+export const createLesson = (data) => api.post('/api/lessons', data);
+export const updateLesson = (data) => api.put('/api/lesson', data);
+export const updateLessonStatus = (id, status) => api.put('/api/lesson/status', { id, status });
+export const reorderLessons = (courseId, lessons) => api.put(`/api/course/${courseId}/lessons/reorder`, { lessons });
+export const deleteLesson = (id) => api.delete(`/api/lesson/${id}`);
+
+// Lesson Resources
+export const addLessonResources = (formData) => api.post('/api/lesson/resources', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const updateLessonResource = (data) => api.put('/api/lesson/resource', data);
+export const reorderLessonResources = (lessonId, resources) => api.put(`/api/lesson/${lessonId}/resources/reorder`, { resources });
+export const deleteLessonResource = (resourceId) => api.delete(`/api/lesson/resource/${resourceId}`);
+
+// Lesson Enrollment Catalog
+export const getLessonsForEnroll = (params) => api.get('/api/lessons/enroll', { params });
 
 // Enrollment
 export const enrollCourse = (data) => api.post('/api/enroll/course', data);
