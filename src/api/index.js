@@ -116,9 +116,6 @@ export const updateLessonResource = (data) => api.put('/api/lesson/resource', da
 export const reorderLessonResources = (lessonId, resources) => api.put(`/api/lesson/${lessonId}/resources/reorder`, { resources });
 export const deleteLessonResource = (resourceId) => api.delete(`/api/lesson/resource/${resourceId}`);
 
-// Lesson Enrollment Catalog
-export const getLessonsForEnroll = (params) => api.get('/api/lessons/enroll', { params });
-
 // Enrollment
 export const enrollCourse = (data) => api.post('/api/enroll/course', data);
 export const enrollCourseFree = (data) => api.post('/api/enroll/course/free', data);
