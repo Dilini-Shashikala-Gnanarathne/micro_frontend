@@ -614,6 +614,14 @@ export default function CoursesPage() {
                             <>
                               <button
                                 className="btn btn-secondary btn-sm"
+                                onClick={() => navigate(`/courses/${c.id}/students`)}
+                                title="View enrolled students"
+                                style={{ padding: "4px 8px" }}
+                              >
+                                👥 Students
+                              </button>
+                              <button
+                                className="btn btn-secondary btn-sm"
                                 onClick={() => openEditModal(c.id)}
                                 title="Edit course"
                                 style={{ padding: "4px 8px" }}
