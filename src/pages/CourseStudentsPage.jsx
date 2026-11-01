@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getCourseEnrolledStudents, getCourseById } from "../api";
+import { getCourseEnrolledStudents, getCourseNonEnrolledStudents, getCourseById, getBatches } from "../api";
 import toast from "react-hot-toast";
 
 const GENDER_BADGE = {
@@ -9,13 +9,28 @@ const GENDER_BADGE = {
   OTHER: "badge-gray",
 };
 
+const ENR_STATUS_CONFIG = {
+  ACTIVE: { label: "Active", bg: "rgba(16, 185, 129, 0.15)", color: "#065f46", border: "rgba(16, 185, 129, 0.3)" },
+  DEACTIVE: { label: "Deactive", bg: "rgba(107, 114, 128, 0.15)", color: "#374151", border: "rgba(107, 114, 128, 0.3)" },
+  PENDING: { label: "Pending", bg: "rgba(245, 158, 11, 0.15)", color: "#92400e", border: "rgba(245, 158, 11, 0.3)" },
+  NOT_PAID: { label: "Not Paid", bg: "rgba(217, 119, 6, 0.15)", color: "#b45309", border: "rgba(217, 119, 6, 0.3)" },
+  REJECTED: { label: "Rejected", bg: "rgba(239, 68, 68, 0.15)", color: "#991b1b", border: "rgba(239, 68, 68, 0.3)" },
+  REMOVED: { label: "Removed", bg: "rgba(220, 38, 38, 0.15)", color: "#7f1d1d", border: "rgba(220, 38, 38, 0.3)" },
+  EXPIRED: { label: "Expired", bg: "rgba(234, 88, 12, 0.15)", color: "#9a3412", border: "rgba(234, 88, 12, 0.3)" },
+  NO_RECORD: { label: "No Record", bg: "rgba(156, 163, 175, 0.12)", color: "#4b5563", border: "rgba(156, 163, 175, 0.3)" },
+};
+
 export default function CourseStudentsPage() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
 
+  // Active Tab: 'ACTIVE' (Enrolled) or 'NOT_ENROLLED' (Not Active / Not Enrolled)
+  const [activeTab, setActiveTab] = useState("ACTIVE");
+
   // Course metadata
   const [course, setCourse] = useState(null);
   const [loadingCourse, setLoadingCourse] = useState(false);
+  const [batches, setBatches] = useState([]);
 
   // Student list & pagination state
   const [students, setStudents] = useState([]);
@@ -24,13 +39,14 @@ export default function CourseStudentsPage() {
 
   // Filter state
   const [search, setSearch] = useState("");
+  const [batchId, setBatchId] = useState("");
   const [gender, setGender] = useState("");
   const [medium, setMedium] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(""); // For Active tab: user status; For Not Enrolled tab: enrollment status
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [sortBy, setSortBy] = useState("enrolled_at");
-  const [sortDir, setSortDir] = useState("DESC");
+  const [sortBy, setSortBy] = useState(activeTab === "ACTIVE" ? "enrolled_at" : "fname");
+  const [sortDir, setSortDir] = useState(activeTab === "ACTIVE" ? "DESC" : "ASC");
 
   // Fetch course metadata
   const fetchCourseInfo = useCallback(async () => {
@@ -47,7 +63,18 @@ export default function CourseStudentsPage() {
     }
   }, [courseId]);
 
-  // Fetch active enrolled students
+  // Fetch batches for filter dropdown
+  const fetchBatches = useCallback(async () => {
+    try {
+      const res = await getBatches();
+      const list = res.data?.data || res.data || [];
+      setBatches(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.warn("Could not load batches:", err);
+    }
+  }, []);
+
+  // Fetch students based on current tab
   const fetchStudents = useCallback(async () => {
     if (!courseId) return;
     setLoading(true);
@@ -59,33 +86,62 @@ export default function CourseStudentsPage() {
         sortDir,
       };
       if (search.trim()) params.search = search.trim();
+      if (batchId) {
+        params.batch_id = batchId;
+        params.batchId = batchId;
+      }
       if (gender) params.gender = gender;
       if (medium) params.medium = medium;
       if (status) params.status = status;
 
-      const res = await getCourseEnrolledStudents(courseId, params);
+      let res;
+      if (activeTab === "ACTIVE") {
+        res = await getCourseEnrolledStudents(courseId, params);
+      } else {
+        res = await getCourseNonEnrolledStudents(courseId, params);
+      }
+
       const resData = res.data?.data || res.data || {};
       const list = resData.data || (Array.isArray(resData) ? resData : []);
       setStudents(list);
       setTotalCount(resData.totalCount ?? list.length ?? 0);
     } catch (err) {
-      console.error("Failed to load enrolled students:", err);
-      const msg = err.response?.data?.message || "Failed to load course enrolled students.";
+      console.error("Failed to load students:", err);
+      const msg = err.response?.data?.message || "Failed to load student records.";
       toast.error(msg);
       setStudents([]);
       setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [courseId, page, size, sortBy, sortDir, search, gender, medium, status]);
+  }, [courseId, activeTab, page, size, sortBy, sortDir, search, batchId, gender, medium, status]);
 
   useEffect(() => {
     fetchCourseInfo();
-  }, [fetchCourseInfo]);
+    fetchBatches();
+  }, [fetchCourseInfo, fetchBatches]);
 
   useEffect(() => {
     fetchStudents();
   }, [fetchStudents]);
+
+  const handleTabChange = (newTab) => {
+    if (newTab === activeTab) return;
+    setActiveTab(newTab);
+    setSearch("");
+    setBatchId("");
+    setGender("");
+    setMedium("");
+    setStatus("");
+    setPage(1);
+    if (newTab === "ACTIVE") {
+      setSortBy("enrolled_at");
+      setSortDir("DESC");
+    } else {
+      setSortBy("fname");
+      setSortDir("ASC");
+    }
+  };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -95,12 +151,18 @@ export default function CourseStudentsPage() {
 
   const handleResetFilters = () => {
     setSearch("");
+    setBatchId("");
     setGender("");
     setMedium("");
     setStatus("");
-    setSortBy("enrolled_at");
-    setSortDir("DESC");
     setPage(1);
+    if (activeTab === "ACTIVE") {
+      setSortBy("enrolled_at");
+      setSortDir("DESC");
+    } else {
+      setSortBy("fname");
+      setSortDir("ASC");
+    }
   };
 
   const totalPages = Math.ceil(totalCount / size) || 1;
@@ -123,7 +185,7 @@ export default function CourseStudentsPage() {
 
   return (
     <div className="page-content" style={{ padding: "24px", maxWidth: "1350px", margin: "0 auto" }}>
-      {/* Top Breadcrumb & Navigation */}
+      {/* Top Navigation */}
       <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
         <button
           onClick={() => navigate("/courses")}
@@ -134,8 +196,17 @@ export default function CourseStudentsPage() {
         </button>
 
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span className="badge badge-success" style={{ fontSize: "13px", padding: "6px 12px" }}>
-            Status: ACTIVE Enrollments
+          <span
+            className="badge"
+            style={{
+              fontSize: "13px",
+              padding: "6px 12px",
+              backgroundColor: activeTab === "ACTIVE" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+              color: activeTab === "ACTIVE" ? "#065f46" : "#991b1b",
+              border: `1px solid ${activeTab === "ACTIVE" ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+            }}
+          >
+            {activeTab === "ACTIVE" ? "Active Enrolled" : "Not In Course / Inactive"}
           </span>
           <span className="badge badge-info" style={{ fontSize: "13px", padding: "6px 12px" }}>
             Total: {totalCount} Students
@@ -148,7 +219,7 @@ export default function CourseStudentsPage() {
         className="card"
         style={{
           padding: "20px 24px",
-          marginBottom: "24px",
+          marginBottom: "20px",
           borderRadius: "12px",
           background: "linear-gradient(135deg, rgba(79, 70, 229, 0.08) 0%, rgba(147, 51, 234, 0.05) 100%)",
           border: "1px solid rgba(79, 70, 229, 0.2)",
@@ -157,9 +228,9 @@ export default function CourseStudentsPage() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
           <div>
             <h1 style={{ fontSize: "22px", fontWeight: "700", margin: "0 0 6px 0", color: "var(--text-primary)" }}>
-              {course ? course.name : "Course Enrolled Students"}
+              {course ? course.name : "Course Students Management"}
             </h1>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", color: "var(--text-muted)", fontSize: "13.5px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", color: "var(--text-muted)", fontSize: "13.5px" }}>
               {course?.code && (
                 <span>
                   <strong>Code:</strong> {course.code}
@@ -182,21 +253,65 @@ export default function CourseStudentsPage() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => fetchStudents()}
-            className="btn btn-secondary btn-sm"
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
-            title="Refresh List"
-          >
-            ↻ Refresh
-          </button>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={() => navigate(`/manual-enrollment?courseId=${courseId}`)}
+              className="btn btn-primary btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+            >
+              + Manual Enrollment
+            </button>
+            <button
+              onClick={() => fetchStudents()}
+              className="btn btn-secondary btn-sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+              title="Refresh List"
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Tabs Switcher */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+        <button
+          onClick={() => handleTabChange("ACTIVE")}
+          className={`btn ${activeTab === "ACTIVE" ? "btn-primary" : "btn-secondary"}`}
+          style={{
+            padding: "8px 18px",
+            fontSize: "14px",
+            fontWeight: "600",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <span>✅</span> Enrolled Students (Active)
+        </button>
+
+        <button
+          onClick={() => handleTabChange("NOT_ENROLLED")}
+          className={`btn ${activeTab === "NOT_ENROLLED" ? "btn-primary" : "btn-secondary"}`}
+          style={{
+            padding: "8px 18px",
+            fontSize: "14px",
+            fontWeight: "600",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <span>⏳</span> Not in Course (Status != ACTIVE)
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="card" style={{ padding: "16px 20px", marginBottom: "20px", borderRadius: "10px" }}>
         <form onSubmit={handleSearchSubmit} style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-end" }}>
-          {/* Keyword Search */}
+          {/* Search Input */}
           <div style={{ flex: "1 1 240px", minWidth: "220px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
               Search Student
@@ -204,15 +319,79 @@ export default function CourseStudentsPage() {
             <input
               type="text"
               className="input"
-              placeholder="Search by Academic ID, Name, Mobile, NIC..."
+              placeholder="Academic ID, Name, Mobile, NIC..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{ width: "100%" }}
             />
           </div>
 
+          {/* Batch Filter */}
+          <div style={{ minWidth: "140px" }}>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
+              Batch
+            </label>
+            <select
+              className="input"
+              value={batchId}
+              onChange={(e) => {
+                setBatchId(e.target.value);
+                setPage(1);
+              }}
+              style={{ width: "100%" }}
+            >
+              <option value="">All Batches</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Enrollment Status Filter (Not Enrolled Tab) or Account Status (Active Tab) */}
+          <div style={{ minWidth: "150px" }}>
+            <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
+              {activeTab === "NOT_ENROLLED" ? "Enrollment Status" : "Account Status"}
+            </label>
+            {activeTab === "NOT_ENROLLED" ? (
+              <select
+                className="input"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+                style={{ width: "100%" }}
+              >
+                <option value="">All Non-Active</option>
+                <option value="NO_RECORD">No Record</option>
+                <option value="DEACTIVE">Deactive</option>
+                <option value="PENDING">Pending</option>
+                <option value="NOT_PAID">Not Paid</option>
+                <option value="EXPIRED">Expired</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="REMOVED">Removed</option>
+              </select>
+            ) : (
+              <select
+                className="input"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+                style={{ width: "100%" }}
+              >
+                <option value="">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="DEACTIVE">Deactive</option>
+              </select>
+            )}
+          </div>
+
           {/* Medium Filter */}
-          <div style={{ minWidth: "130px" }}>
+          <div style={{ minWidth: "120px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
               Medium
             </label>
@@ -225,14 +404,14 @@ export default function CourseStudentsPage() {
               }}
               style={{ width: "100%" }}
             >
-              <option value="">All Mediums</option>
+              <option value="">All</option>
               <option value="SINHALA">Sinhala</option>
               <option value="ENGLISH">English</option>
             </select>
           </div>
 
           {/* Gender Filter */}
-          <div style={{ minWidth: "120px" }}>
+          <div style={{ minWidth: "110px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
               Gender
             </label>
@@ -245,30 +424,10 @@ export default function CourseStudentsPage() {
               }}
               style={{ width: "100%" }}
             >
-              <option value="">All Genders</option>
+              <option value="">All</option>
               <option value="MALE">Male</option>
               <option value="FEMALE">Female</option>
               <option value="OTHER">Other</option>
-            </select>
-          </div>
-
-          {/* Account Status Filter */}
-          <div style={{ minWidth: "130px" }}>
-            <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
-              Account Status
-            </label>
-            <select
-              className="input"
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setPage(1);
-              }}
-              style={{ width: "100%" }}
-            >
-              <option value="">All Statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="DEACTIVE">Deactive</option>
             </select>
           </div>
 
@@ -286,18 +445,30 @@ export default function CourseStudentsPage() {
               }}
               style={{ width: "100%" }}
             >
-              <option value="enrolled_at">Enrolled Date</option>
-              <option value="approved_at">Approved Date</option>
-              <option value="expires_at">Expiry Date</option>
-              <option value="academic_id">Academic ID</option>
-              <option value="fname">First Name</option>
-              <option value="lname">Last Name</option>
-              <option value="mobile">Mobile</option>
+              {activeTab === "ACTIVE" ? (
+                <>
+                  <option value="enrolled_at">Enrolled Date</option>
+                  <option value="approved_at">Approved Date</option>
+                  <option value="expires_at">Expiry Date</option>
+                  <option value="academic_id">Academic ID</option>
+                  <option value="fname">First Name</option>
+                  <option value="lname">Last Name</option>
+                  <option value="mobile">Mobile</option>
+                </>
+              ) : (
+                <>
+                  <option value="fname">First Name</option>
+                  <option value="lname">Last Name</option>
+                  <option value="academic_id">Academic ID</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="enrolled_at">Last Enrolled At</option>
+                </>
+              )}
             </select>
           </div>
 
           {/* Sort Direction Toggle */}
-          <div style={{ minWidth: "90px" }}>
+          <div style={{ minWidth: "85px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
               Order
             </label>
@@ -310,8 +481,8 @@ export default function CourseStudentsPage() {
               }}
               style={{ width: "100%" }}
             >
-              <option value="DESC">DESC</option>
               <option value="ASC">ASC</option>
+              <option value="DESC">DESC</option>
             </select>
           </div>
 
@@ -332,16 +503,22 @@ export default function CourseStudentsPage() {
         {loading ? (
           <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-muted)" }}>
             <div className="spinner" style={{ margin: "0 auto 12px" }}></div>
-            <p style={{ margin: 0 }}>Loading enrolled students...</p>
+            <p style={{ margin: 0 }}>Loading student records...</p>
           </div>
         ) : students.length === 0 ? (
           <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-muted)" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>👥</div>
-            <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "6px" }}>No Active Enrolled Students Found</h3>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>
+              {activeTab === "ACTIVE" ? "👥" : "🔍"}
+            </div>
+            <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "6px" }}>
+              {activeTab === "ACTIVE" ? "No Active Enrolled Students Found" : "No Matching Students Found"}
+            </h3>
             <p style={{ fontSize: "13.5px", margin: 0 }}>
-              {search || gender || medium || status
-                ? "No enrolled students matched your search criteria. Try adjusting the filters."
-                : "No students are currently actively enrolled in this course."}
+              {search || gender || medium || status || batchId
+                ? "No students matched your search criteria. Try adjusting the filters."
+                : activeTab === "ACTIVE"
+                ? "No students are currently actively enrolled in this course."
+                : "All students appear to be actively enrolled in this course."}
             </p>
           </div>
         ) : (
@@ -354,15 +531,21 @@ export default function CourseStudentsPage() {
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Mobile & NIC</th>
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Gender / Medium</th>
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Batch</th>
-                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>User Status</th>
+                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>
+                    {activeTab === "NOT_ENROLLED" ? "Latest Enrollment" : "Account Status"}
+                  </th>
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Enrollment Details</th>
+                  {activeTab === "NOT_ENROLLED" && (
+                    <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", textTransform: "uppercase" }}>Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {students.map((student) => {
                   const fullName = [student.fname, student.lname].filter(Boolean).join(" ") || "-";
                   const genderClass = GENDER_BADGE[student.gender] || "badge-gray";
-                  const isUserActive = student.status === "ACTIVE";
+                  const enrStatusKey = student.enrollment?.status || (student.enrollment?.id ? "PENDING" : "NO_RECORD");
+                  const enrConfig = ENR_STATUS_CONFIG[enrStatusKey] || ENR_STATUS_CONFIG.NO_RECORD;
 
                   return (
                     <tr key={student.enrollment?.id || student.id} style={{ borderBottom: "1px solid var(--border)" }}>
@@ -433,27 +616,67 @@ export default function CourseStudentsPage() {
                         )}
                       </td>
 
-                      {/* Account Status */}
+                      {/* Enrollment Status / Account Status */}
                       <td style={{ padding: "12px 16px" }}>
-                        <span className={`badge ${isUserActive ? "badge-success" : "badge-danger"}`} style={{ fontSize: "12px" }}>
-                          {student.status || "ACTIVE"}
-                        </span>
+                        {activeTab === "NOT_ENROLLED" ? (
+                          <span
+                            className="badge"
+                            style={{
+                              fontSize: "12px",
+                              padding: "4px 9px",
+                              backgroundColor: enrConfig.bg,
+                              color: enrConfig.color,
+                              border: `1px solid ${enrConfig.border}`,
+                            }}
+                          >
+                            {enrConfig.label}
+                          </span>
+                        ) : (
+                          <span
+                            className={`badge ${student.status === "ACTIVE" ? "badge-success" : "badge-danger"}`}
+                            style={{ fontSize: "12px" }}
+                          >
+                            {student.status || "ACTIVE"}
+                          </span>
+                        )}
                       </td>
 
                       {/* Enrollment Details */}
                       <td style={{ padding: "12px 16px", fontSize: "12px" }}>
-                        <div style={{ color: "var(--text-secondary)", marginBottom: "2px" }}>
-                          <strong>Enrolled:</strong> {formatDate(student.enrollment?.enrolled_at)}
-                        </div>
-                        {student.enrollment?.approved_at && (
-                          <div style={{ color: "var(--text-muted)", marginBottom: "2px" }}>
-                            <strong>Approved:</strong> {formatDate(student.enrollment.approved_at)}
-                          </div>
+                        {student.enrollment?.id ? (
+                          <>
+                            <div style={{ color: "var(--text-secondary)", marginBottom: "2px" }}>
+                              <strong>Enrolled:</strong> {formatDate(student.enrollment?.enrolled_at)}
+                            </div>
+                            {student.enrollment?.approved_at && (
+                              <div style={{ color: "var(--text-muted)", marginBottom: "2px" }}>
+                                <strong>Approved:</strong> {formatDate(student.enrollment.approved_at)}
+                              </div>
+                            )}
+                            <div style={{ color: student.enrollment?.expires_at ? "var(--warning)" : "var(--text-muted)" }}>
+                              <strong>Expires:</strong> {student.enrollment?.expires_at ? formatDate(student.enrollment.expires_at) : "Never"}
+                            </div>
+                          </>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+                            No enrollment record
+                          </span>
                         )}
-                        <div style={{ color: student.enrollment?.expires_at ? "var(--warning)" : "var(--text-muted)" }}>
-                          <strong>Expires:</strong> {student.enrollment?.expires_at ? formatDate(student.enrollment.expires_at) : "Never"}
-                        </div>
                       </td>
+
+                      {/* Actions for Not Enrolled tab */}
+                      {activeTab === "NOT_ENROLLED" && (
+                        <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => navigate(`/manual-enrollment?courseId=${courseId}&studentId=${student.id}`)}
+                            title="Enroll this student"
+                            style={{ fontSize: "12px", padding: "4px 10px" }}
+                          >
+                            + Enroll
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -527,4 +750,3 @@ export default function CourseStudentsPage() {
     </div>
   );
 }
-

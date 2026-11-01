@@ -69,6 +69,7 @@ export const getStudentCourses = (params) => api.get('/api/student/courses/filte
 export const getAdminCourses = (params) => api.get('/api/courses/filter', { params });
 export const getCourseById = (id) => api.get(`/api/course/${id}`);
 export const getCourseEnrolledStudents = (courseId, params) => api.get(`/api/course/${courseId}/students`, { params });
+export const getCourseNonEnrolledStudents = (courseId, params) => api.get(`/api/course/${courseId}/students/not-enrolled`, { params });
 export const createCourse = (formData) => api.post('/api/aca/course', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });
