@@ -233,6 +233,9 @@ export const deleteStudentIncident = (incidentId) => api.delete(`/api/user/stude
 // Student Enrolled Courses Filter
 export const getStudentEnrolledCourses = (params) => api.get('/api/student/enrolled-courses/filter', { params });
 
+// Student Enrolled Lessons Filter
+export const getStudentEnrolledLessons = (params) => api.get('/api/student/enrolled-lessons/filter', { params });
+
 
 
 

@@ -443,8 +443,8 @@ export default function MyCoursesPage() {
             {activeTab === "package_only"
               ? "You do not have any enrolled courses through packages yet."
               : activeTab === "course_only"
-              ? "You do not have any directly enrolled standalone courses yet."
-              : "You have not enrolled in any courses yet or no courses match your current search criteria."}
+                ? "You do not have any directly enrolled standalone courses yet."
+                : "You have not enrolled in any courses yet or no courses match your current search criteria."}
           </p>
           <button className="btn btn-primary" onClick={() => navigate("/catalog")}>
             Browse Available Courses

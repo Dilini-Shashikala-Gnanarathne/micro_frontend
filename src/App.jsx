@@ -24,6 +24,7 @@ import TuteRequestsPage from "./pages/TuteRequestsPage";
 import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
 import StudentIncidentsPage from "./pages/StudentIncidentsPage";
 import MyCoursesPage from "./pages/MyCoursesPage";
+import MyLessonsPage from "./pages/MyLessonsPage";
 
 function App() {
   return (
@@ -58,6 +59,8 @@ function App() {
             <Route path="/courses" element={<CoursesPage />} />
             <Route path="/my-courses" element={<MyCoursesPage />} />
             <Route path="/enrolled-courses" element={<MyCoursesPage />} />
+            <Route path="/my-lessons" element={<MyLessonsPage />} />
+            <Route path="/enrolled-lessons" element={<MyLessonsPage />} />
             <Route path="/packages" element={<PackagesPage />} />
             <Route path="/packages/:id/buy" element={<PackageBuyPage />} />
             <Route
