@@ -230,6 +230,9 @@ export const createStudentIncident = (studentId, data) => api.post(`/api/user/st
 export const updateStudentIncident = (incidentId, data) => api.put(`/api/user/student/incident/${incidentId}`, data);
 export const deleteStudentIncident = (incidentId) => api.delete(`/api/user/student/incident/${incidentId}`);
 
+// Student Enrolled Courses Filter
+export const getStudentEnrolledCourses = (params) => api.get('/api/student/enrolled-courses/filter', { params });
+
 
 
 

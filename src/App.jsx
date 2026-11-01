@@ -23,6 +23,7 @@ import FreeCardStudentsPage from "./pages/FreeCardStudentsPage";
 import TuteRequestsPage from "./pages/TuteRequestsPage";
 import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
 import StudentIncidentsPage from "./pages/StudentIncidentsPage";
+import MyCoursesPage from "./pages/MyCoursesPage";
 
 function App() {
   return (
@@ -55,6 +56,8 @@ function App() {
             <Route path="/catalog" element={<EnrollmentCatalogPage />} />
             <Route path="/enrollment-catalog" element={<EnrollmentCatalogPage />} />
             <Route path="/courses" element={<CoursesPage />} />
+            <Route path="/my-courses" element={<MyCoursesPage />} />
+            <Route path="/enrolled-courses" element={<MyCoursesPage />} />
             <Route path="/packages" element={<PackagesPage />} />
             <Route path="/packages/:id/buy" element={<PackageBuyPage />} />
             <Route
