@@ -27,6 +27,7 @@ import MyCoursesPage from "./pages/MyCoursesPage";
 import MyLessonsPage from "./pages/MyLessonsPage";
 import CourseWithLessonsPage from "./pages/CourseWithLessonsPage";
 import LessonWithResourcesPage from "./pages/LessonWithResourcesPage";
+import MyMeetingsPage from "./pages/MyMeetingsPage";
 
 function App() {
   return (
@@ -64,6 +65,8 @@ function App() {
             <Route path="/courses/:id" element={<CourseWithLessonsPage />} />
             <Route path="/enrolled-courses" element={<MyCoursesPage />} />
             <Route path="/my-lessons" element={<MyLessonsPage />} />
+            <Route path="/my-meetings" element={<MyMeetingsPage />} />
+            <Route path="/meetings" element={<MyMeetingsPage />} />
             <Route path="/my-lessons/:id" element={<LessonWithResourcesPage />} />
             <Route path="/lessons/:id" element={<LessonWithResourcesPage />} />
             <Route path="/enrolled-lessons" element={<MyLessonsPage />} />

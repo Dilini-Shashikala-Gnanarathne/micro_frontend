@@ -241,3 +241,6 @@ export const getStudentCourseWithLessons = (id) => api.get(`/api/student/enrolle
 
 // Student Lesson With Resources
 export const getStudentLessonWithResources = (id) => api.get(`/api/student/enrolled-lesson/${id}`);
+
+// Student Live Meetings
+export const getStudentMeetings = () => api.get('/api/student/meetings');
