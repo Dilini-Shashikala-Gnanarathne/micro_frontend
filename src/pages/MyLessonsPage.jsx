@@ -343,7 +343,7 @@ export default function MyLessonsPage() {
                       <tr key={enr.id || item.id}>
                         {/* Lesson Name */}
                         <td>
-                          <div style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "14px" }}>
+                          <div style={{ fontWeight: 700, color: hasAccess ? "var(--primary)" : "var(--text-primary)", fontSize: "14px", cursor: hasAccess ? "pointer" : "default" }} onClick={() => { if (hasAccess) navigate(`/my-lessons/${item.id}`); }}>
                             {item.name}
                           </div>
                           <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
@@ -406,7 +406,7 @@ export default function MyLessonsPage() {
                           {hasAccess ? (
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => navigate(`/lessons?courseId=${item.courseId || ""}`)}
+                              onClick={() => navigate(`/my-lessons/${item.id}`)}
                               id={`btn-open-lesson-${item.id}`}
                             >
                               ▶ Open Lesson

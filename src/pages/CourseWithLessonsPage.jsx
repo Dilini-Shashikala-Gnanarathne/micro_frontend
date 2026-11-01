@@ -495,7 +495,7 @@ export default function CourseWithLessonsPage() {
                     {canAccessLesson ? (
                       <button
                         className="btn btn-primary"
-                        onClick={() => setSelectedLesson(lesson)}
+                        onClick={() => navigate(`/my-lessons/${lesson.id}`)}
                         style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 14px", fontSize: "13px" }}
                       >
                         <span>▶</span>

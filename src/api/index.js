@@ -239,7 +239,5 @@ export const getStudentEnrolledLessons = (params) => api.get('/api/student/enrol
 // Student Course With Lessons
 export const getStudentCourseWithLessons = (id) => api.get(`/api/student/enrolled-course/${id}`);
 
-
-
-
-
+// Student Lesson With Resources
+export const getStudentLessonWithResources = (id) => api.get(`/api/student/enrolled-lesson/${id}`);
