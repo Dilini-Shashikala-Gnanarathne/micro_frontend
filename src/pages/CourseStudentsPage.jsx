@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getCourseEnrolledStudents, getCourseNonEnrolledStudents, getCourseById, getBatches } from "../api";
+import {
+  getCourseEnrolledStudents,
+  getCourseNonEnrolledStudents,
+  getCourseOldStudents,
+  getCourseById,
+  getBatches,
+} from "../api";
 import toast from "react-hot-toast";
 
 const GENDER_BADGE = {
@@ -24,7 +30,7 @@ export default function CourseStudentsPage() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
 
-  // Active Tab: 'ACTIVE' (Enrolled) or 'NOT_ENROLLED' (Not Active / Not Enrolled)
+  // Active Tab: 'ACTIVE' | 'NOT_ENROLLED' | 'OLD_STUDENTS'
   const [activeTab, setActiveTab] = useState("ACTIVE");
 
   // Course metadata
@@ -42,11 +48,11 @@ export default function CourseStudentsPage() {
   const [batchId, setBatchId] = useState("");
   const [gender, setGender] = useState("");
   const [medium, setMedium] = useState("");
-  const [status, setStatus] = useState(""); // For Active tab: user status; For Not Enrolled tab: enrollment status
+  const [status, setStatus] = useState(""); // activeTab dependent: user status or enrollment status
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(10);
-  const [sortBy, setSortBy] = useState(activeTab === "ACTIVE" ? "enrolled_at" : "fname");
-  const [sortDir, setSortDir] = useState(activeTab === "ACTIVE" ? "DESC" : "ASC");
+  const [sortBy, setSortBy] = useState("enrolled_at");
+  const [sortDir, setSortDir] = useState("DESC");
 
   // Fetch course metadata
   const fetchCourseInfo = useCallback(async () => {
@@ -97,8 +103,10 @@ export default function CourseStudentsPage() {
       let res;
       if (activeTab === "ACTIVE") {
         res = await getCourseEnrolledStudents(courseId, params);
-      } else {
+      } else if (activeTab === "NOT_ENROLLED") {
         res = await getCourseNonEnrolledStudents(courseId, params);
+      } else {
+        res = await getCourseOldStudents(courseId, params);
       }
 
       const resData = res.data?.data || res.data || {};
@@ -134,7 +142,7 @@ export default function CourseStudentsPage() {
     setMedium("");
     setStatus("");
     setPage(1);
-    if (newTab === "ACTIVE") {
+    if (newTab === "ACTIVE" || newTab === "OLD_STUDENTS") {
       setSortBy("enrolled_at");
       setSortDir("DESC");
     } else {
@@ -156,7 +164,7 @@ export default function CourseStudentsPage() {
     setMedium("");
     setStatus("");
     setPage(1);
-    if (activeTab === "ACTIVE") {
+    if (activeTab === "ACTIVE" || activeTab === "OLD_STUDENTS") {
       setSortBy("enrolled_at");
       setSortDir("DESC");
     } else {
@@ -183,6 +191,33 @@ export default function CourseStudentsPage() {
     }
   };
 
+  const getTabBadgeInfo = () => {
+    if (activeTab === "ACTIVE") {
+      return {
+        label: "Active Enrolled",
+        bg: "rgba(16, 185, 129, 0.15)",
+        color: "#065f46",
+        border: "rgba(16, 185, 129, 0.3)",
+      };
+    }
+    if (activeTab === "NOT_ENROLLED") {
+      return {
+        label: "Not in Course",
+        bg: "rgba(107, 114, 128, 0.15)",
+        color: "#374151",
+        border: "rgba(107, 114, 128, 0.3)",
+      };
+    }
+    return {
+      label: "Old Students (Former)",
+      bg: "rgba(234, 88, 12, 0.15)",
+      color: "#9a3412",
+      border: "rgba(234, 88, 12, 0.3)",
+    };
+  };
+
+  const tabBadge = getTabBadgeInfo();
+
   return (
     <div className="page-content" style={{ padding: "24px", maxWidth: "1350px", margin: "0 auto" }}>
       {/* Top Navigation */}
@@ -201,12 +236,12 @@ export default function CourseStudentsPage() {
             style={{
               fontSize: "13px",
               padding: "6px 12px",
-              backgroundColor: activeTab === "ACTIVE" ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
-              color: activeTab === "ACTIVE" ? "#065f46" : "#991b1b",
-              border: `1px solid ${activeTab === "ACTIVE" ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"}`,
+              backgroundColor: tabBadge.bg,
+              color: tabBadge.color,
+              border: `1px solid ${tabBadge.border}`,
             }}
           >
-            {activeTab === "ACTIVE" ? "Active Enrolled" : "Not In Course / Inactive"}
+            {tabBadge.label}
           </span>
           <span className="badge badge-info" style={{ fontSize: "13px", padding: "6px 12px" }}>
             Total: {totalCount} Students
@@ -274,7 +309,7 @@ export default function CourseStudentsPage() {
       </div>
 
       {/* Tabs Switcher */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+      <div style={{ display: "flex", gap: "10px", marginBottom: "16px", borderBottom: "1px solid var(--border)", paddingBottom: "8px", flexWrap: "wrap" }}>
         <button
           onClick={() => handleTabChange("ACTIVE")}
           className={`btn ${activeTab === "ACTIVE" ? "btn-primary" : "btn-secondary"}`}
@@ -305,6 +340,22 @@ export default function CourseStudentsPage() {
           }}
         >
           <span>⏳</span> Not in Course (Status != ACTIVE)
+        </button>
+
+        <button
+          onClick={() => handleTabChange("OLD_STUDENTS")}
+          className={`btn ${activeTab === "OLD_STUDENTS" ? "btn-primary" : "btn-secondary"}`}
+          style={{
+            padding: "8px 18px",
+            fontSize: "14px",
+            fontWeight: "600",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <span>🎓</span> Old Students (Deactive / Expired / Removed)
         </button>
       </div>
 
@@ -349,12 +400,27 @@ export default function CourseStudentsPage() {
             </select>
           </div>
 
-          {/* Enrollment Status Filter (Not Enrolled Tab) or Account Status (Active Tab) */}
-          <div style={{ minWidth: "150px" }}>
+          {/* Status Filter Dropdown */}
+          <div style={{ minWidth: "160px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "600", marginBottom: "5px", color: "var(--text-muted)" }}>
-              {activeTab === "NOT_ENROLLED" ? "Enrollment Status" : "Account Status"}
+              {activeTab === "ACTIVE" ? "Account Status" : "Enrollment Status"}
             </label>
-            {activeTab === "NOT_ENROLLED" ? (
+            {activeTab === "OLD_STUDENTS" ? (
+              <select
+                className="input"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+                style={{ width: "100%" }}
+              >
+                <option value="">All Old Statuses</option>
+                <option value="EXPIRED">Expired</option>
+                <option value="DEACTIVE">Deactive</option>
+                <option value="REMOVED">Removed</option>
+              </select>
+            ) : activeTab === "NOT_ENROLLED" ? (
               <select
                 className="input"
                 value={status}
@@ -445,7 +511,15 @@ export default function CourseStudentsPage() {
               }}
               style={{ width: "100%" }}
             >
-              {activeTab === "ACTIVE" ? (
+              {activeTab === "NOT_ENROLLED" ? (
+                <>
+                  <option value="fname">First Name</option>
+                  <option value="lname">Last Name</option>
+                  <option value="academic_id">Academic ID</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="enrolled_at">Last Enrolled At</option>
+                </>
+              ) : (
                 <>
                   <option value="enrolled_at">Enrolled Date</option>
                   <option value="approved_at">Approved Date</option>
@@ -454,14 +528,6 @@ export default function CourseStudentsPage() {
                   <option value="fname">First Name</option>
                   <option value="lname">Last Name</option>
                   <option value="mobile">Mobile</option>
-                </>
-              ) : (
-                <>
-                  <option value="fname">First Name</option>
-                  <option value="lname">Last Name</option>
-                  <option value="academic_id">Academic ID</option>
-                  <option value="mobile">Mobile</option>
-                  <option value="enrolled_at">Last Enrolled At</option>
                 </>
               )}
             </select>
@@ -481,8 +547,8 @@ export default function CourseStudentsPage() {
               }}
               style={{ width: "100%" }}
             >
-              <option value="ASC">ASC</option>
               <option value="DESC">DESC</option>
+              <option value="ASC">ASC</option>
             </select>
           </div>
 
@@ -508,16 +574,22 @@ export default function CourseStudentsPage() {
         ) : students.length === 0 ? (
           <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-muted)" }}>
             <div style={{ fontSize: "40px", marginBottom: "12px" }}>
-              {activeTab === "ACTIVE" ? "👥" : "🔍"}
+              {activeTab === "ACTIVE" ? "👥" : activeTab === "OLD_STUDENTS" ? "🎓" : "🔍"}
             </div>
             <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "6px" }}>
-              {activeTab === "ACTIVE" ? "No Active Enrolled Students Found" : "No Matching Students Found"}
+              {activeTab === "ACTIVE"
+                ? "No Active Enrolled Students Found"
+                : activeTab === "OLD_STUDENTS"
+                ? "No Old / Former Students Found"
+                : "No Matching Students Found"}
             </h3>
             <p style={{ fontSize: "13.5px", margin: 0 }}>
               {search || gender || medium || status || batchId
                 ? "No students matched your search criteria. Try adjusting the filters."
                 : activeTab === "ACTIVE"
                 ? "No students are currently actively enrolled in this course."
+                : activeTab === "OLD_STUDENTS"
+                ? "No students with expired, deactive, or removed enrollments found for this course."
                 : "All students appear to be actively enrolled in this course."}
             </p>
           </div>
@@ -532,10 +604,10 @@ export default function CourseStudentsPage() {
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Gender / Medium</th>
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Batch</th>
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>
-                    {activeTab === "NOT_ENROLLED" ? "Latest Enrollment" : "Account Status"}
+                    {activeTab === "ACTIVE" ? "Account Status" : "Enrollment Status"}
                   </th>
                   <th style={{ padding: "12px 16px", textAlign: "left", fontSize: "12px", textTransform: "uppercase" }}>Enrollment Details</th>
-                  {activeTab === "NOT_ENROLLED" && (
+                  {activeTab !== "ACTIVE" && (
                     <th style={{ padding: "12px 16px", textAlign: "center", fontSize: "12px", textTransform: "uppercase" }}>Actions</th>
                   )}
                 </tr>
@@ -616,9 +688,16 @@ export default function CourseStudentsPage() {
                         )}
                       </td>
 
-                      {/* Enrollment Status / Account Status */}
+                      {/* Status */}
                       <td style={{ padding: "12px 16px" }}>
-                        {activeTab === "NOT_ENROLLED" ? (
+                        {activeTab === "ACTIVE" ? (
+                          <span
+                            className={`badge ${student.status === "ACTIVE" ? "badge-success" : "badge-danger"}`}
+                            style={{ fontSize: "12px" }}
+                          >
+                            {student.status || "ACTIVE"}
+                          </span>
+                        ) : (
                           <span
                             className="badge"
                             style={{
@@ -630,13 +709,6 @@ export default function CourseStudentsPage() {
                             }}
                           >
                             {enrConfig.label}
-                          </span>
-                        ) : (
-                          <span
-                            className={`badge ${student.status === "ACTIVE" ? "badge-success" : "badge-danger"}`}
-                            style={{ fontSize: "12px" }}
-                          >
-                            {student.status || "ACTIVE"}
                           </span>
                         )}
                       </td>
@@ -664,16 +736,16 @@ export default function CourseStudentsPage() {
                         )}
                       </td>
 
-                      {/* Actions for Not Enrolled tab */}
-                      {activeTab === "NOT_ENROLLED" && (
+                      {/* Action buttons */}
+                      {activeTab !== "ACTIVE" && (
                         <td style={{ padding: "12px 16px", textAlign: "center" }}>
                           <button
                             className="btn btn-primary btn-sm"
                             onClick={() => navigate(`/manual-enrollment?courseId=${courseId}&studentId=${student.id}`)}
-                            title="Enroll this student"
+                            title={activeTab === "OLD_STUDENTS" ? "Re-enroll this old student" : "Enroll this student"}
                             style={{ fontSize: "12px", padding: "4px 10px" }}
                           >
-                            + Enroll
+                            {activeTab === "OLD_STUDENTS" ? "↻ Re-Enroll" : "+ Enroll"}
                           </button>
                         </td>
                       )}

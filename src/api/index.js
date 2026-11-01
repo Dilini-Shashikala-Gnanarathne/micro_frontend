@@ -68,8 +68,9 @@ export const getCourses = (params) => {
 export const getStudentCourses = (params) => api.get('/api/student/courses/filter', { params });
 export const getAdminCourses = (params) => api.get('/api/courses/filter', { params });
 export const getCourseById = (id) => api.get(`/api/course/${id}`);
-export const getCourseEnrolledStudents = (courseId, params) => api.get(`/api/course/${courseId}/students`, { params });
+export const getCourseEnrolledStudents = (courseId, params) => api.get(`/api/course/${courseId}/enrolled-students`, { params });
 export const getCourseNonEnrolledStudents = (courseId, params) => api.get(`/api/course/${courseId}/students/not-enrolled`, { params });
+export const getCourseOldStudents = (courseId, params) => api.get(`/api/course/${courseId}/students/old`, { params });
 export const createCourse = (formData) => api.post('/api/aca/course', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });
