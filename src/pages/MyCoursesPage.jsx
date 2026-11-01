@@ -591,8 +591,12 @@ export default function MyCoursesPage() {
                         fontSize: "16px",
                         fontWeight: 700,
                         margin: 0,
-                        color: "var(--text-primary)",
+                        color: hasAccess ? "var(--primary)" : "var(--text-primary)",
                         lineHeight: 1.35,
+                        cursor: hasAccess ? "pointer" : "default",
+                      }}
+                      onClick={() => {
+                        if (hasAccess) navigate(`/my-courses/${item.id}`);
                       }}
                     >
                       {item.name}
@@ -657,7 +661,7 @@ export default function MyCoursesPage() {
                       {hasAccess ? (
                         <button
                           className="btn btn-primary btn-block"
-                          onClick={() => navigate(`/lessons?courseId=${item.id}`)}
+                          onClick={() => navigate(`/my-courses/${item.id}`)}
                           id={`btn-view-lessons-${item.id}`}
                         >
                           ▶ Watch Lessons & Materials

@@ -25,6 +25,7 @@ import ManualEnrollmentPage from "./pages/ManualEnrollmentPage";
 import StudentIncidentsPage from "./pages/StudentIncidentsPage";
 import MyCoursesPage from "./pages/MyCoursesPage";
 import MyLessonsPage from "./pages/MyLessonsPage";
+import CourseWithLessonsPage from "./pages/CourseWithLessonsPage";
 
 function App() {
   return (
@@ -58,6 +59,8 @@ function App() {
             <Route path="/enrollment-catalog" element={<EnrollmentCatalogPage />} />
             <Route path="/courses" element={<CoursesPage />} />
             <Route path="/my-courses" element={<MyCoursesPage />} />
+            <Route path="/my-courses/:id" element={<CourseWithLessonsPage />} />
+            <Route path="/courses/:id" element={<CourseWithLessonsPage />} />
             <Route path="/enrolled-courses" element={<MyCoursesPage />} />
             <Route path="/my-lessons" element={<MyLessonsPage />} />
             <Route path="/enrolled-lessons" element={<MyLessonsPage />} />
