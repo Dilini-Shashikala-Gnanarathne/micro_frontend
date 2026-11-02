@@ -1,4 +1,4 @@
-﻿import Sidebar from "./Sidebar";
+import Sidebar from "./Sidebar";
 import { Outlet, useLocation } from "react-router-dom";
 
 const pageTitles = {
@@ -9,6 +9,11 @@ const pageTitles = {
   "/enroll": "Enroll Student",
   "/payments/course": "Course Payment Requests",
   "/payments/package": "Package Payment Requests",
+  "/history": "Student Activity History",
+  "/history/enrollments": "Course Enrollment History",
+  "/history/payments": "Payment & Order History",
+  "/history/lesson-requests": "Lesson Request History",
+  "/history/tute-requests": "Tute Request History",
 };
 
 export default function AppLayout() {

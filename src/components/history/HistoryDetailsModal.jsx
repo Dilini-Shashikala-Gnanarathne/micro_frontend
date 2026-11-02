@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function HistoryDetailsModal({ type, item, onClose }) {
   if (!item) return null;
 
