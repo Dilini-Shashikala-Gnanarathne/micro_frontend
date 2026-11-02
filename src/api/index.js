@@ -247,3 +247,10 @@ export const getStudentLessonWithResources = (id) => api.get(`/api/student/enrol
 
 // Student Live Meetings
 export const getStudentMeetings = () => api.get('/api/student/meetings');
+
+
+// Student History
+export const getStudentEnrollmentHistory = (params) => api.get('/api/student/history/enrollments', { params });
+export const getStudentPaymentHistory = (params) => api.get('/api/student/history/payments', { params });
+export const getStudentLessonRequestHistory = (params) => api.get('/api/student/history/lesson-requests', { params });
+export const getStudentTuteRequestHistory = (params) => api.get('/api/student/history/tute-requests', { params });
