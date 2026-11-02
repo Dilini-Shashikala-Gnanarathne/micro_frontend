@@ -29,6 +29,7 @@ import CourseWithLessonsPage from "./pages/CourseWithLessonsPage";
 import LessonWithResourcesPage from "./pages/LessonWithResourcesPage";
 import MyMeetingsPage from "./pages/MyMeetingsPage";
 import CourseStudentsPage from "./pages/CourseStudentsPage";
+import HistoryPage from "./pages/HistoryPage";
 
 function App() {
   return (
@@ -136,6 +137,11 @@ function App() {
             <Route path="/payments/course" element={<CoursePaymentsPage />} />
             <Route path="/payments/package" element={<PackagePaymentsPage />} />
             <Route path="/payments/lesson" element={<ProtectedRoute adminOnly><LessonPaymentsPage /></ProtectedRoute>} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/history/enrollments" element={<HistoryPage defaultTab="enrollments" />} />
+            <Route path="/history/payments" element={<HistoryPage defaultTab="payments" />} />
+            <Route path="/history/lesson-requests" element={<HistoryPage defaultTab="lessons" />} />
+            <Route path="/history/tute-requests" element={<HistoryPage defaultTab="tutes" />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
