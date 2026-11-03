@@ -90,6 +90,19 @@ export default function CoursesPage() {
   const [deletingCourse, setDeletingCourse] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Partial / Quick Edit Modal state (Tests partial updateCourse)
+  const [quickEditCourse, setQuickEditCourse] = useState(null);
+  const [quickEditFields, setQuickEditFields] = useState({
+    name: "",
+    croppedPrice: "",
+    defaultWatchTimeLimit: "",
+    description: "",
+    note: "",
+    isFeatured: false,
+    hasTute: false,
+  });
+  const [quickSubmitting, setQuickSubmitting] = useState(false);
+
   // Fetch batches for dropdown
   useEffect(() => {
     if (isAdmin) {
@@ -194,10 +207,11 @@ export default function CoursesPage() {
         originalPrice: Number(c.original_price ?? c.originalPrice ?? 0),
         croppedPrice: Number(c.cropped_price ?? c.croppedPrice ?? 0),
         defaultWatchTimeLimit: c.default_watch_time_limit ? Number(c.default_watch_time_limit) : 120,
-        expiryType: c.expiry_type || c.expiryType || "NONE",
-        expiryDays: c.expiry_days ? Number(c.expiry_days) : 30,
-        expiryDate: (c.expiry_date || c.expiryDate || "").split("T")[0] || "",
+        expiryType: c.expiry?.expiry_type || c.expiry?.expiryType || c.expiry_type || c.expiryType || "NONE",
+        expiryDays: c.expiry?.expiry_days ?? c.expiry?.expiryDays ?? c.expiry_days ?? 30,
+        expiryDate: (c.expiry?.expiry_date || c.expiry?.expiryDate || c.expiry_date || c.expiryDate || "").split("T")[0] || "",
         imageUrl: c.image_url || c.imageUrl || "",
+        parentIds: (c.parentCourses || c.parent_courses || []).map(p => typeof p === "object" ? (p.parent_id || p.id) : p).filter(Boolean),
       });
       setImagePreview(c.image_url || c.imageUrl || null);
       setImageFile(null);
@@ -234,6 +248,80 @@ export default function CoursesPage() {
     }
   };
 
+  // Open Quick / Partial Edit Modal (Tests partial updateCourse)
+  const openQuickEditModal = (c) => {
+    setQuickEditCourse(c);
+    setQuickEditFields({
+      name: c.name || "",
+      croppedPrice: c.cropped_price ?? c.croppedPrice ?? "",
+      defaultWatchTimeLimit: c.default_watch_time_limit ?? c.defaultWatchTimeLimit ?? "",
+      description: c.description || "",
+      note: c.note || "",
+      isFeatured: Boolean(Number(c.is_featured ?? c.isFeatured)),
+      hasTute: Boolean(Number(c.has_tute ?? c.hasTute)),
+    });
+  };
+
+  const handleQuickEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!quickEditCourse) return;
+
+    setQuickSubmitting(true);
+    try {
+      // Send ONLY the fields being partially updated along with ID
+      const partialPayload = {
+        id: quickEditCourse.id,
+      };
+
+      if (quickEditFields.name.trim() !== (quickEditCourse.name || "")) {
+        partialPayload.name = quickEditFields.name.trim();
+      }
+
+      const newPrice = quickEditFields.croppedPrice !== "" ? Number(quickEditFields.croppedPrice) : null;
+      if (newPrice !== null && newPrice !== Number(quickEditCourse.cropped_price ?? quickEditCourse.croppedPrice)) {
+        partialPayload.croppedPrice = newPrice;
+      }
+
+      const newLimit = quickEditFields.defaultWatchTimeLimit !== "" ? Number(quickEditFields.defaultWatchTimeLimit) : null;
+      if (newLimit !== null && newLimit !== Number(quickEditCourse.default_watch_time_limit ?? quickEditCourse.defaultWatchTimeLimit)) {
+        partialPayload.defaultWatchTimeLimit = newLimit;
+      }
+
+      if (quickEditFields.description !== (quickEditCourse.description || "")) {
+        partialPayload.description = quickEditFields.description.trim() || null;
+      }
+
+      if (quickEditFields.note !== (quickEditCourse.note || "")) {
+        partialPayload.note = quickEditFields.note.trim() || null;
+      }
+
+      const newFeatured = quickEditFields.isFeatured ? 1 : 0;
+      if (newFeatured !== Number(quickEditCourse.is_featured ?? quickEditCourse.isFeatured ?? 0)) {
+        partialPayload.isFeatured = newFeatured;
+      }
+
+      const newHasTute = quickEditFields.hasTute ? 1 : 0;
+      if (newHasTute !== Number(quickEditCourse.has_tute ?? quickEditCourse.hasTute ?? 0)) {
+        partialPayload.hasTute = newHasTute;
+      }
+
+      // Verify that at least one field is being partially updated
+      if (Object.keys(partialPayload).length <= 1) {
+        toast.error("No changes made to update.");
+        setQuickSubmitting(false);
+        return;
+      }
+
+      await updateCourse(partialPayload);
+      toast.success("Course partially updated successfully!");
+      setQuickEditCourse(null);
+      fetchCourses();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Partial update failed.");
+    } finally {
+      setQuickSubmitting(false);
+    }
+  };
   // Submit Create or Update
   const handleSubmitForm = async (e) => {
     e.preventDefault();
@@ -266,7 +354,7 @@ export default function CoursesPage() {
         expiryDays: formData.expiryType === "RELATIVE" ? Number(formData.expiryDays) : null,
         expiryDate: formData.expiryType === "FIXED" ? formData.expiryDate : null,
         imageUrl: formData.imageUrl || "placeholder",
-        parentIds: [],
+        parentIds: formData.courseType === 'EXTRA_CLASS' ? (formData.parentIds || []) : [],
         physicalClassIds: [],
       };
 
@@ -943,6 +1031,18 @@ export default function CoursesPage() {
                   />
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">Meta Tags (SEO / Search Keywords)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. physics, a/l 2026, mechanics, revision (comma separated)"
+                    value={formData.metaTags}
+                    onChange={(e) => setFormData((p) => ({ ...p, metaTags: e.target.value }))}
+                    disabled={submitting}
+                  />
+                </div>
+
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Note / Special Instructions</label>
                   <textarea
@@ -1006,7 +1106,27 @@ export default function CoursesPage() {
                 <div><strong>Price:</strong> LKR {Number(viewingCourse.cropped_price ?? viewingCourse.croppedPrice ?? 0).toLocaleString()}</div>
                 <div><strong>Watch Limit:</strong> {viewingCourse.default_watch_time_limit || "None"} mins</div>
                 <div><strong>Includes Tute:</strong> {Number(viewingCourse.has_tute ?? viewingCourse.hasTute) ? "Yes" : "No"}</div>
-                <div><strong>Expiry:</strong> {viewingCourse.expiry_type || "None"}</div>
+                <div><strong>Expiry:</strong> {
+                  (() => {
+                    const exp = viewingCourse.expiry;
+                    const expType = exp?.expiry_type || exp?.expiryType || viewingCourse.expiry_type || viewingCourse.expiryType || "NONE";
+                    if (expType === "RELATIVE") {
+                      const days = exp?.expiry_days ?? exp?.expiryDays ?? viewingCourse.expiry_days;
+                      return `Relative (${days || 0} days)`;
+                    }
+                    if (expType === "FIXED") {
+                      const date = exp?.expiry_date || exp?.expiryDate || viewingCourse.expiry_date;
+                      return `Fixed (${(date || "").split("T")[0]})`;
+                    }
+                    return "None";
+                  })()
+                }</div>
+                <div><strong>Parent Courses:</strong> {
+                  (viewingCourse.parentCourses || viewingCourse.parent_courses || []).length > 0
+                    ? (viewingCourse.parentCourses || viewingCourse.parent_courses).map(p => typeof p === "object" ? (p.parent_name || p.name || p.code || p.parent_id) : p).join(", ")
+                    : "None"
+                }</div>
+                <div><strong>Meta Tags:</strong> {viewingCourse.meta_tags || viewingCourse.metaTags || "None"}</div>
               </div>
 
               {viewingCourse.note && (
@@ -1022,6 +1142,141 @@ export default function CoursesPage() {
         </div>
       )}
 
+      {/* QUICK / PARTIAL EDIT MODAL (Tests partial updateCourse) */}
+      {quickEditCourse && (
+        <div className="modal-overlay" onClick={() => !quickSubmitting && setQuickEditCourse(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>⚡ Quick Partial Update</span>
+                  <span className="badge badge-primary" style={{ fontSize: 11 }}>Tests Partial PUT</span>
+                </h3>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
+                  Updating {quickEditCourse.name} ({quickEditCourse.code}) — only modified fields will be sent!
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => !quickSubmitting && setQuickEditCourse(null)}>✕</button>
+            </div>
+            <form onSubmit={handleQuickEditSubmit}>
+              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="alert alert-info" style={{ fontSize: 12, padding: "8px 12px" }}>
+                  💡 <strong>Partial Update Test:</strong> Unchanged/omitted fields won't be sent in the request body, verifying our backend refactoring!
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Course Name</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={quickEditFields.name}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, name: e.target.value }))}
+                    disabled={quickSubmitting}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Cropped Price (LKR)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={quickEditFields.croppedPrice}
+                      onChange={(e) => setQuickEditFields((p) => ({ ...p, croppedPrice: e.target.value }))}
+                      disabled={quickSubmitting}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Watch Limit (Mins)</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={quickEditFields.defaultWatchTimeLimit}
+                      onChange={(e) => setQuickEditFields((p) => ({ ...p, defaultWatchTimeLimit: e.target.value }))}
+                      disabled={quickSubmitting}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Short Description</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={quickEditFields.description}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, description: e.target.value }))}
+                    disabled={quickSubmitting}
+                  />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Meta Tags</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="comma-separated tags..."
+                    value={quickEditFields.metaTags || ""}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, metaTags: e.target.value }))}
+                    disabled={quickSubmitting}
+                  />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Internal Note</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={quickEditFields.note}
+                    onChange={(e) => setQuickEditFields((p) => ({ ...p, note: e.target.value }))}
+                    disabled={quickSubmitting}
+                  />
+                </div>
+
+                <div style={{ display: "flex", gap: 20, paddingTop: 6 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={quickEditFields.isFeatured}
+                      onChange={(e) => setQuickEditFields((p) => ({ ...p, isFeatured: e.target.checked }))}
+                      disabled={quickSubmitting}
+                    />
+                    <span>Featured Course</span>
+                  </label>
+
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={quickEditFields.hasTute}
+                      onChange={(e) => setQuickEditFields((p) => ({ ...p, hasTute: e.target.checked }))}
+                      disabled={quickSubmitting}
+                    />
+                    <span>Includes Tute</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setQuickEditCourse(null)}
+                  disabled={quickSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={quickSubmitting}
+                >
+                  {quickSubmitting ? "Updating..." : "Save Partial Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       {/* DELETE CONFIRMATION MODAL */}
       {deletingCourse && (
         <div className="modal-overlay" onClick={() => !deleting && setDeletingCourse(null)}>
