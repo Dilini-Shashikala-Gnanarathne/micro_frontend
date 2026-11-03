@@ -24,6 +24,29 @@ const COURSE_TYPE_OPTIONS = ["MONTHLY_CLASS", "LESSON_PACK", "FREE_CLASS", "EXTR
 const EXPIRY_TYPE_OPTIONS = ["NONE", "RELATIVE", "FIXED"];
 const STATUS_OPTIONS = ["ACTIVE", "DEACTIVE", "DRAFT"];
 
+// Normalize meta tag helper: replaces symbols/spaces with '-' and trims
+export const normalizeMetaTag = (tag) => {
+  if (!tag) return "";
+  return tag
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+};
+
+// Normalize comma-separated meta tags list
+export const normalizeMetaTagList = (tagList) => {
+  if (!tagList) return "";
+  const tags = tagList.split(",");
+  const unique = [];
+  for (const t of tags) {
+    const cleaned = normalizeMetaTag(t);
+    if (cleaned && !unique.includes(cleaned)) {
+      unique.push(cleaned);
+    }
+  }
+  return unique.join(", ");
+};
+
 const INITIAL_FORM = {
   code: "",
   name: "",
@@ -154,6 +177,7 @@ export default function CoursesPage() {
     setFilters({
       name: "",
       code: "",
+      metaTags: "",
       medium: "",
       courseType: "",
       status: "",
@@ -488,6 +512,16 @@ export default function CoursesPage() {
               onChange={(e) => handleFilterChange("code", e.target.value)}
             />
 
+            {/* Filter by Meta Tags */}
+            <input
+              className="form-control"
+              style={{ width: 160 }}
+              placeholder="Meta tag (e.g. 2026-a-l)"
+              value={filters.metaTags || ""}
+              onChange={(e) => handleFilterChange("metaTags", e.target.value)}
+              title="Search by Meta Tag keyword"
+            />
+
             {/* Medium */}
             <select
               className="form-control"
@@ -820,6 +854,31 @@ export default function CoursesPage() {
                   </div>
                 </div>
 
+                {/* Meta Tags - Prominent SEO / Search Input */}
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 600 }}>Meta Tags (Keywords for Search / SEO)</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>Symbols & spaces convert to hyphens (e.g. 2026 A/L → 2026-a-l)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. physics, 2026 a/l, mechanics, paper class, revision"
+                    value={formData.metaTags}
+                    onChange={(e) => setFormData((p) => ({ ...p, metaTags: e.target.value }))}
+                    disabled={submitting}
+                    style={{ background: '#f8fafc', borderColor: '#cbd5e1' }}
+                  />
+                  {formData.metaTags && (
+                    <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text-muted)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--primary)' }}>Saved as: </span>
+                      <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: 4, color: '#1e293b' }}>
+                        {normalizeMetaTagList(formData.metaTags) || "—"}
+                      </code>
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
                   <div className="form-group">
                     <label className="form-label">Medium <span>*</span></label>
@@ -1031,17 +1090,6 @@ export default function CoursesPage() {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Meta Tags (SEO / Search Keywords)</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="e.g. physics, a/l 2026, mechanics, revision (comma separated)"
-                    value={formData.metaTags}
-                    onChange={(e) => setFormData((p) => ({ ...p, metaTags: e.target.value }))}
-                    disabled={submitting}
-                  />
-                </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Note / Special Instructions</label>
@@ -1211,15 +1259,23 @@ export default function CoursesPage() {
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Meta Tags</label>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Meta Tags</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Auto-hyphenated</span>
+                  </label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="comma-separated tags..."
+                    placeholder="e.g. 2026 A/L, physics, theory / revision"
                     value={quickEditFields.metaTags || ""}
                     onChange={(e) => setQuickEditFields((p) => ({ ...p, metaTags: e.target.value }))}
                     disabled={quickSubmitting}
                   />
+                  {quickEditFields.metaTags && (
+                    <div style={{ marginTop: 4, fontSize: 11, color: 'var(--text-muted)' }}>
+                      Preview: <code>{normalizeMetaTagList(quickEditFields.metaTags)}</code>
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
