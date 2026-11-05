@@ -323,10 +323,18 @@ export default function EnrollPage() {
     setLoading(true);
     let payload = {};
     let endpoint = "";
-    const isFreeCourse = enrollType === "course" && selected && Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0);
+
+    const freeReasons = ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"];
+    const reasonMatch = selected?.reason ? freeReasons.includes(selected.reason) : false;
+    const isFreeReasonCourse = enrollType === "course" && selected && (
+      reasonMatch ||
+      Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
+    );
 
     try {
       let res;
+      let isEnrollingViaFreeEndpoint = false;
+
       if (enrollType === "course") {
         const hasTute = isTuteAvailable(selected);
         const tuteData = {};
@@ -345,11 +353,14 @@ export default function EnrollPage() {
           }
         }
 
-        if (isFreeCourse) {
+        // If reason TYPE_FREE / PRICE_ZERO / EXTRA_PARENT / FREE_CARD:
+        // - AND has_tute = false (or student doesn't need tute) -> POST /api/enroll/course/free
+        // - AND has_tute = true AND student needs tute -> POST /api/enroll/course
+        if (isFreeReasonCourse && (!hasTute || !needTute)) {
+          isEnrollingViaFreeEndpoint = true;
           endpoint = "POST /api/enroll/course/free";
           payload = {
             courseId: selected.id,
-            ...tuteData,
           };
           res = await enrollCourseFree(payload);
         } else {
@@ -386,9 +397,9 @@ export default function EnrollPage() {
         responsePayload: res.data,
         timestamp: new Date().toLocaleTimeString(),
       });
-      toast.success(res.data?.message || (isFreeCourse ? "Free course enrollment processed successfully!" : "Enrollment processed successfully!"));
+      toast.success(res.data?.message || (isEnrollingViaFreeEndpoint ? "Free course enrollment processed successfully!" : "Enrollment processed successfully!"));
 
-      if (isFreeCourse) {
+      if (isEnrollingViaFreeEndpoint) {
         setStep(4); // Instant completion for free courses (no slip required)
       } else if (paymentMethod === "DIGITAL") {
         setStep(3); // Go to slip upload step
@@ -837,17 +848,30 @@ export default function EnrollPage() {
                 )
               )}
 
-              {enrollType === "course" && selected && Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0) ? (
+              {enrollType === "course" && selected && (
+                (selected.reason && ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"].includes(selected.reason)) ||
+                Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
+              ) && (!isTuteAvailable(selected) || !needTute) ? (
                 <div style={{ background: "#ecfdf5", border: "1.5px solid #a7f3d0", padding: "16px", borderRadius: "var(--radius-sm)", marginBottom: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#065f46", fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>
-                    <span>🎉</span> 100% Free / Complimentary Course Enrollment
+                    <span>🎉</span> 100% Free Course Enrollment
                   </div>
                   <div style={{ fontSize: "12.5px", color: "#047857" }}>
-                    No payment is required for this course. Click below to directly enroll via <code>POST /api/enroll/course/free</code>.
+                    {selected.reason ? `Eligible for free enrollment (${selected.reason}). ` : "No payment is required for this course. "}
+                    Click below to directly enroll via <code>POST /api/enroll/course/free</code>.
                   </div>
                 </div>
               ) : (
-                PAYMENT_METHODS.map((m) => (
+                <>
+                  {enrollType === "course" && selected && (
+                    (selected.reason && ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"].includes(selected.reason)) ||
+                    Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
+                  ) && isTuteAvailable(selected) && needTute && (
+                    <div style={{ background: "#eff6ff", border: "1.5px solid #bfdbfe", padding: "12px 16px", borderRadius: "var(--radius-sm)", marginBottom: "16px", fontSize: "12.5px", color: "#1e40af" }}>
+                      ℹ️ Free course with study pack requested. Enrollment and delivery processing will be routed via <code>POST /api/enroll/course</code>. Please select payment method for delivery/tute fee if applicable.
+                    </div>
+                  )}
+                  {PAYMENT_METHODS.map((m) => (
                   <div
                     key={m.value}
                     style={{
@@ -887,14 +911,18 @@ export default function EnrollPage() {
                       <div style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "2px" }}>{m.desc}</div>
                     </div>
                   </div>
-                ))
+                ))}
+                </>
               )}
               <div style={{ marginTop: "20px", display: "flex", gap: "10px", justifyContent: "flex-end" }}>
                 <button className="btn btn-secondary" onClick={() => setStep(1)} id="btn-pm-back">Back</button>
                 <button className="btn btn-primary" onClick={handleEnroll} disabled={loading} id="btn-proceed-enroll">
                   {loading ? (
                     <span className="spinner" />
-                  ) : (enrollType === "course" && selected && Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)) ? (
+                  ) : (enrollType === "course" && selected && (
+                    (selected.reason && ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"].includes(selected.reason)) ||
+                    Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
+                  ) && (!isTuteAvailable(selected) || !needTute)) ? (
                     "Complete Free Enrollment →"
                   ) : (
                     "Process Enrollment →"
