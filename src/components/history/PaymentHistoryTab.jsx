@@ -265,7 +265,24 @@ export default function PaymentHistoryTab({ onViewDetails }) {
                       </div>
                     </td>
                     <td>
-                      {item.orderItem?.product ? (
+                      {Array.isArray(item.orderItems) && item.orderItems.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {item.orderItems.map((oi, idx) => (
+                            <div key={oi.id || idx}>
+                              <div style={{ fontWeight: 600, fontSize: '13px' }}>
+                                {oi.product?.name || 'Item'}
+                              </div>
+                              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', display: 'flex', gap: '6px', marginTop: '2px' }}>
+                                <span className="badge badge-gray" style={{ fontSize: '10.5px', padding: '1px 6px' }}>
+                                  {oi.product?.type}
+                                </span>
+                                {oi.product?.code && <span>{oi.product.code}</span>}
+                                {oi.quantity > 1 && <span>Qty: {oi.quantity}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : item.orderItem?.product ? (
                         <div>
                           <div style={{ fontWeight: 600, fontSize: '13px' }}>
                             {item.orderItem.product.name}

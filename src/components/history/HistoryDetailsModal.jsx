@@ -162,7 +162,31 @@ export default function HistoryDetailsModal({ type, item, onClose }) {
                 </div>
               </div>
 
-              {item.orderItem?.product && (
+              {Array.isArray(item.orderItems) && item.orderItems.length > 0 ? (
+                <div style={{ padding: '12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    Order Items ({item.orderItems.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {item.orderItems.map((oi, idx) => (
+                      <div key={oi.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: idx < item.orderItems.length - 1 ? '1px dashed var(--border)' : 'none', paddingBottom: idx < item.orderItems.length - 1 ? '8px' : 0 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{oi.product?.name || 'Item'}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                            Type: {oi.product?.type} {oi.product?.code ? `| Code: ${oi.product.code}` : ''}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 600 }}>{formatCurrency(oi.total)}</div>
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                            Qty: {oi.quantity ?? 1} &times; {formatCurrency(oi.unitPrice)}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : item.orderItem?.product ? (
                 <div style={{ padding: '12px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>Product Details</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -180,7 +204,7 @@ export default function HistoryDetailsModal({ type, item, onClose }) {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               <div>
                 <h4 style={{ fontSize: '13px', fontWeight: 700, marginBottom: '8px', color: 'var(--text-secondary)' }}>Payment & Slip Details</h4>
