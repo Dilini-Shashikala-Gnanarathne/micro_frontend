@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getCourses,
+  getCourseEnrollmentProduct,
   updateCourseEnrollment,
   updatePackageEnrollment,
   updateLessonEnrollment,
@@ -182,24 +183,46 @@ export default function EnrollPage() {
     if (typeParam === "course") {
       setEnrollType("course");
       setLoading(true);
-      getCourses({ size: 100 })
-        .then((res) => {
-          const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
-          setItems(Array.isArray(list) ? list : []);
-          if (courseIdParam) {
-            const found = (Array.isArray(list) ? list : []).find((c) => c.id === courseIdParam);
-            if (found) {
-              setSelected(found);
+      if (courseIdParam) {
+        // Fetch detailed course enrollment info from GET /api/student/enroll/course/{id}
+        getCourseEnrollmentProduct(courseIdParam)
+          .then((res) => {
+            const courseDetails = res.data?.data || res.data;
+            if (courseDetails && courseDetails.id) {
+              setSelected(courseDetails);
               setStep(2);
             } else {
               setStep(1);
             }
-          } else {
+          })
+          .catch((err) => {
+            console.warn("Failed to load course enrollment details, falling back to course list:", err);
+            // Fallback to getCourses if enrollment detail call fails
+            getCourses({ size: 100 })
+              .then((res) => {
+                const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
+                setItems(Array.isArray(list) ? list : []);
+                const found = (Array.isArray(list) ? list : []).find((c) => c.id === courseIdParam);
+                if (found) {
+                  setSelected(found);
+                  setStep(2);
+                } else {
+                  setStep(1);
+                }
+              })
+              .catch((e) => toast.error(e.response?.data?.message || "Failed to load course"));
+          })
+          .finally(() => setLoading(false));
+      } else {
+        getCourses({ size: 100 })
+          .then((res) => {
+            const list = res.data?.data?.items || res.data?.data?.data || res.data?.data || [];
+            setItems(Array.isArray(list) ? list : []);
             setStep(1);
-          }
-        })
-        .catch((err) => toast.error(err.response?.data?.message || "Failed to load courses"))
-        .finally(() => setLoading(false));
+          })
+          .catch((err) => toast.error(err.response?.data?.message || "Failed to load courses"))
+          .finally(() => setLoading(false));
+      }
     } else if (typeParam === "package") {
       if (packageIdParam) {
         navigate(`/packages/${packageIdParam}/buy`);
@@ -309,11 +332,23 @@ export default function EnrollPage() {
     }
   };
 
-  const handleItemSelect = (item) => {
+  const handleItemSelect = async (item) => {
     if (enrollType === "lesson") {
       setSelectedLessons((prev) =>
         prev.find((p) => p.id === item.id) ? prev.filter((p) => p.id !== item.id) : [...prev, item]
       );
+    } else if (enrollType === "course") {
+      setSelected(item);
+      // Fetch full enrollment state via GET /api/student/enroll/course/{id}
+      try {
+        const res = await getCourseEnrollmentProduct(item.id);
+        const data = res.data?.data || res.data;
+        if (data && data.id) {
+          setSelected(data);
+        }
+      } catch (err) {
+        console.warn("Could not fetch full course enrollment details:", err);
+      }
     } else {
       setSelected(item);
     }
@@ -353,24 +388,42 @@ export default function EnrollPage() {
           }
         }
 
-        // If reason TYPE_FREE / PRICE_ZERO / EXTRA_PARENT / FREE_CARD:
-        // - AND has_tute = false (or student doesn't need tute) -> POST /api/enroll/course/free
-        // - AND has_tute = true AND student needs tute -> POST /api/enroll/course
-        if (isFreeReasonCourse && (!hasTute || !needTute)) {
-          isEnrollingViaFreeEndpoint = true;
-          endpoint = "POST /api/enroll/course/free";
+        // Check if student already has an active or pending enrollment with an order
+        const existingOrderId = selected?.enrollment?.order_id || selected?.enrollment?.orderId;
+        const hasExistingEnrollment = Boolean(selected?.enrollment && existingOrderId);
+
+        if (hasExistingEnrollment) {
+          // If class already has enrollment, set update endpoint
+          endpoint = "PUT /api/enroll/update/course";
           payload = {
-            courseId: selected.id,
-          };
-          res = await enrollCourseFree(payload);
-        } else {
-          endpoint = "POST /api/enroll/course";
-          payload = {
-            courseId: selected.id,
+            orderId: existingOrderId,
             paymentMethod,
-            ...tuteData,
+            needTute,
+            needHomeDelivery,
+            deliveryInstituteId: needTute && !needHomeDelivery ? (deliveryInstituteId || null) : null,
           };
-          res = await enrollCourse(payload);
+          res = await updateCourseEnrollment(payload);
+        } else {
+          // If course does not have enrollment, follow existing flow:
+          // If reason TYPE_FREE / PRICE_ZERO / EXTRA_PARENT / FREE_CARD:
+          // - AND has_tute = false (or student doesn't need tute) -> POST /api/enroll/course/free
+          // - AND has_tute = true AND student needs tute -> POST /api/enroll/course
+          if (isFreeReasonCourse && (!hasTute || !needTute)) {
+            isEnrollingViaFreeEndpoint = true;
+            endpoint = "POST /api/enroll/course/free";
+            payload = {
+              courseId: selected.id,
+            };
+            res = await enrollCourseFree(payload);
+          } else {
+            endpoint = "POST /api/enroll/course";
+            payload = {
+              courseId: selected.id,
+              paymentMethod,
+              ...tuteData,
+            };
+            res = await enrollCourse(payload);
+          }
         }
       } else if (enrollType === "package") {
         endpoint = "POST /api/enroll/package";
@@ -740,6 +793,11 @@ export default function EnrollPage() {
               </div>
               <div className="alert alert-info">
                 <span>Enrolling in: <strong>{selected?.name || `${selectedLessons.length} lesson(s)`}</strong></span>
+                {enrollType === "course" && selected?.enrollment?.order_id && (
+                  <div style={{ marginTop: "6px", fontSize: "12px", color: "#1e3a8a", fontWeight: 600 }}>
+                    ℹ️ Existing enrollment found (Status: {selected?.enrollment?.status || "NOT_PAID"}, Order: {selected.enrollment.order_id}). Clicking proceed will update your enrollment via <code>PUT /api/enroll/update/course</code>.
+                  </div>
+                )}
               </div>
 
               {/* Tute Request Section for Single Course Enrollment */}
@@ -848,7 +906,7 @@ export default function EnrollPage() {
                 )
               )}
 
-              {enrollType === "course" && selected && (
+              {enrollType === "course" && selected && !selected?.enrollment?.order_id && (
                 (selected.reason && ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"].includes(selected.reason)) ||
                 Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
               ) && (!isTuteAvailable(selected) || !needTute) ? (
@@ -919,6 +977,8 @@ export default function EnrollPage() {
                 <button className="btn btn-primary" onClick={handleEnroll} disabled={loading} id="btn-proceed-enroll">
                   {loading ? (
                     <span className="spinner" />
+                  ) : (enrollType === "course" && selected?.enrollment?.order_id) ? (
+                    "Update Course Enrollment →"
                   ) : (enrollType === "course" && selected && (
                     (selected.reason && ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"].includes(selected.reason)) ||
                     Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
