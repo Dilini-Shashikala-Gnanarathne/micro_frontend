@@ -766,10 +766,21 @@ export default function EnrollPage() {
                     <div style={{ marginTop: "20px", textAlign: "right" }}>
                       <button
                         className="btn btn-primary"
-                        onClick={() => {
+                        onClick={async () => {
                           if (enrollType === "package") {
                             navigate(`/packages/${selected.id}/buy`);
                           } else {
+                            if (enrollType === "course" && selected?.id && (!selected.enrollment && selected.enrollment !== null)) {
+                              try {
+                                const res = await getCourseEnrollmentProduct(selected.id);
+                                const fullCourse = res.data?.data || res.data;
+                                if (fullCourse && fullCourse.id) {
+                                  setSelected(fullCourse);
+                                }
+                              } catch (e) {
+                                console.warn("Failed to fetch latest course details:", e);
+                              }
+                            }
                             setStep(2);
                           }
                         }}
