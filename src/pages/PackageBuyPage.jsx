@@ -145,49 +145,92 @@ export default function PackageBuyPage() {
     }
   };
 
+
+  useEffect(() => {
+    if (!selectedCombination?.items) return;
+
+    setCourseTuteOptions((prev) => {
+      const updated = { ...prev };
+
+      selectedCombination.items.forEach((item) => {
+        if (!updated[item.courseId]) {
+          updated[item.courseId] = {
+            needTute: false,
+            needHomeDelivery: true,
+            deliveryInstituteId: "",
+          };
+        }
+      });
+
+      return updated;
+    });
+  }, [selectedComboId, pkg]);
+
+
   const selectedCombination = pkg?.combinations?.find((c) => c.id === selectedComboId);
 
   // 1. STEP 1: ONLY CALL /api/enroll/package
+
   const handleInitiateEnroll = async () => {
     if (!selectedComboId) {
       toast.error("Please select a package combination.");
       return;
     }
 
-    // Validate tute options if selected
     const formattedCourses = [];
+
     if (selectedCombination?.items) {
       for (const item of selectedCombination.items) {
-        const cId = item.courseId;
-        const opt = courseTuteOptions[cId];
-        if (opt && opt.needTute) {
-          if (!opt.needHomeDelivery && !opt.deliveryInstituteId) {
-            toast.error("Please choose a pickup institute for all courses requesting institute collection.");
-            return;
-          }
-          formattedCourses.push({
-            courseId: cId,
-            needTute: true,
-            needHomeDelivery: Boolean(opt.needHomeDelivery),
-            deliveryInstituteId: opt.needHomeDelivery ? null : opt.deliveryInstituteId,
-          });
+        const courseId = item.courseId;
+
+        // Default values when the student hasn't changed options
+        const opt = courseTuteOptions[courseId] || {
+          needTute: false,
+          needHomeDelivery: true,
+          deliveryInstituteId: "",
+        };
+
+        // Include every course in the selected combination
+        formattedCourses.push({
+          courseId,
+          needTute: Boolean(opt.needTute),
+          needHomeDelivery: Boolean(opt.needHomeDelivery),
+          deliveryInstituteId: opt.needTute && !opt.needHomeDelivery
+            ? opt.deliveryInstituteId
+            : null,
+        });
+
+        // Validate institute selection
+        if (
+          opt.needTute &&
+          !opt.needHomeDelivery &&
+          !opt.deliveryInstituteId
+        ) {
+          toast.error(
+            "Please choose a pickup institute for all courses requesting institute collection."
+          );
+          return;
         }
       }
     }
 
     setEnrolling(true);
+
     try {
       const payload = {
-        packageCombinationId: selectedComboId,
+        packageId: id,
         paymentMethod: paymentMethod,
+        courses: formattedCourses,
       };
-      if (formattedCourses.length > 0) {
-        payload.courses = formattedCourses;
-      }
+
+      console.log("ENROLLMENT REQUEST PAYLOAD:", payload);
+
       const res = await enrollPackage(payload);
 
       const data = res.data?.data || res.data;
+
       setEnrollData(data);
+
       setLastApiCall({
         endpoint: "POST /api/enroll/package",
         status: res.status || 201,
@@ -195,29 +238,41 @@ export default function PackageBuyPage() {
         responsePayload: res.data,
         timestamp: new Date().toLocaleTimeString(),
       });
-      toast.success(res.data?.message || "Package enrollment created successfully!");
 
-      // If DIGITAL and not free: Move to step 2 to upload evidence
+      toast.success(
+        res.data?.message || "Package enrollment created successfully!"
+      );
+
       const isFree = Boolean(
         enrollmentProduct?.is_free ||
-        (enrollmentProduct?.price !== undefined && Number(enrollmentProduct?.price) <= 0)
+        (
+          enrollmentProduct?.price !== undefined &&
+          Number(enrollmentProduct?.price) <= 0
+        )
       );
+
       if (paymentMethod === "DIGITAL" && !isFree) {
         setStep(2);
       } else {
-        // ONLINE, MANUAL, PAY_LATER, or FREE: Move straight to completion
         setStep(3);
       }
+
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || "Failed to initiate package enrollment";
+      const msg =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to initiate package enrollment";
+
       toast.error(msg);
+
     } finally {
       setEnrolling(false);
     }
   };
 
+
   // 2. STEP 2: ONLY CALL /api/payment/evidence/upload
-    const handleCancelPackageTest = async () => {
+  const handleCancelPackageTest = async () => {
     const orderId = enrollData?.orderId;
     if (!orderId) {
       toast.error("No Order ID found to cancel.");

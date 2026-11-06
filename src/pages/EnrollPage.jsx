@@ -428,7 +428,7 @@ export default function EnrollPage() {
       } else if (enrollType === "package") {
         endpoint = "POST /api/enroll/package";
         payload = {
-          packageCombinationId: selected.packageCombinationId || selected.id,
+          packageId: selected.packageId || selected.id,
           paymentMethod,
         };
         res = await enrollPackage(payload);
