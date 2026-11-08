@@ -98,85 +98,61 @@ export const getAdminPackages = (params) => api.get('/api/packages/filter', { pa
 // Lessons
 export const getCourseLessons = (courseId) => api.get(`/api/course/${courseId}/lessons/all`);
 export const getLessonById = (id) => api.get(`/api/lesson/${id}`);
-export const getLessons = (params) => {
-  if (params?.courseId) {
-    return getCourseLessons(params.courseId);
-  }
-  return api.get('/api/lessons/all', { params });
-};
-export const getAllLessons = (params) => api.get('/api/lessons/all', { params });
-export const createLesson = (data) => api.post('/api/lessons', data);
-export const updateLesson = (data) => api.put('/api/lesson', data);
+export const createLesson = (data) => api.post('/api/aca/lesson', data);
+export const updateLesson = (id, data) => api.put(`/api/aca/lesson/${id}`, data);
 export const updateLessonStatus = (id, status) => api.put('/api/lesson/status', { id, status });
-export const reorderLessons = (courseId, lessons) => api.put(`/api/course/${courseId}/lessons/reorder`, { lessons });
 export const deleteLesson = (id) => api.delete(`/api/lesson/${id}`);
 
 // Lesson Resources
-export const addLessonResources = (formData) => api.post('/api/lesson/resources', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
-export const updateLessonResource = (data) => api.put('/api/lesson/resource', data);
-export const reorderLessonResources = (lessonId, resources) => api.put(`/api/lesson/${lessonId}/resources/reorder`, { resources });
-export const deleteLessonResource = (resourceId) => api.delete(`/api/lesson/resource/${resourceId}`);
+export const getLessonResources = (lessonId) => api.get(`/api/lesson/${lessonId}/resources`);
+export const createLessonResource = (data) => api.post('/api/lesson/resource', data);
+export const deleteLessonResource = (id) => api.delete(`/api/lesson/resource/${id}`);
 
-// Enrollment
+// Physical Institutes
+export const getPhysicalInstitutes = (params) => api.get('/api/institutes/filter', { params });
+export const createPhysicalInstitute = (data) => api.post('/api/institute', data);
+export const updatePhysicalInstitute = (id, data) => api.put(`/api/institute/${id}`, data);
+export const deletePhysicalInstitute = (id) => api.delete(`/api/institute/${id}`);
+
+// Batches
+export const getBatches = () => api.get('/api/user/batches/all');
+export const createBatch = (data) => api.post('/api/user/batch', data);
+export const updateBatch = (id, data) => api.put(`/api/user/batch/${id}`, data);
+export const deleteBatch = (id) => api.delete(`/api/user/batch/${id}`);
+
+// Enrollment Operations
 export const enrollCourse = (data) => api.post('/api/enroll/course', data);
 export const enrollCourseFree = (data) => api.post('/api/enroll/course/free', data);
 export const enrollPackage = (data) => api.post('/api/enroll/package', data);
 export const enrollLesson = (data) => api.post('/api/enroll/lesson', data);
-export const updateEnrollment = (data) => api.post('/api/enroll/update', data);
+export const cancelEnrollment = (data) => api.post('/api/enroll/cancel', data);
+
 export const updateCourseEnrollment = (data) => api.put('/api/enroll/update/course', data);
 export const updatePackageEnrollment = (data) => api.put('/api/enroll/update/package', data);
 export const updateLessonEnrollment = (data) => api.put('/api/enroll/update/lesson', data);
-export const cancelEnrollment = (data) => api.post('/api/enroll/cancel', data);
-export const removeEnrollment = (enrollmentId) => api.patch('/api/enrollment/remove', { enrollmentId });
-export const getEnrollDetails = (id) => api.get('/api/enroll', { params: { id } });
 
-// Course Requests (admin)
-export const getCourseRequests = (params) => api.get('/api/enroll/requests/course', { params });
-export const getPackageRequests = (params) => api.get('/api/enroll/requests/package', { params });
-export const getLessonRequests = (params) => api.get('/api/enroll/requests/lesson', { params });
+// Enrollment Approval & Rejection (Admin)
+export const approveEnrollment = (orderId, data) => api.put(`/api/payment/${orderId}/approve`, data);
+export const rejectEnrollment = (orderId, data) => api.put(`/api/payment/${orderId}/reject`, data);
+export const deleteEnrollmentOrder = (orderId) => api.delete(`/api/enrollment/${orderId}`);
 
-// Payment approve & reject (admin)
-export const approvePayment = (paymentId) => api.put(`/api/payment/${paymentId}/approve`);
-export const rejectPayment = (paymentId, reason) => api.put(`/api/payment/${paymentId}/reject`, { reason });
-
-// Payment evidence upload
-export const uploadPaymentSlip = (formData) => api.post('/api/payment/evidence/upload', formData);
-
-// Reject reasons
-export const getRejectReasons = (params) => api.get('/api/payment/reject-reasons/filter', { params });
-
-
-// Package Management
-export const createPackage = (formData) => api.post('/api/academic/package', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
-export const updatePackage = (formData) => api.post('/api/academic/package/update', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' }
-});
-export const getPackageById = (id) => api.get(`/api/academic/package/${id}`);
-export const deletePackage = (id) => api.delete(`/api/academic/package/${id}`);
-export const updatePackageStatus = (id, status) => api.put(`/api/academic/package/status/${id}`, { status });
-export const getBatches = () => api.get('/api/user/batches/all');
-
-export default api;
-
-// Physical Institutes & Student Profile
-export const getPhysicalInstitutes = () => api.get('/api/academic/physical-institutes/all');
-export const getStudentProfile = (userId) => api.get('/api/user/student/' + userId);
-export const createPhysicalInstitute = (data) => api.post('/api/academic/physical-institute', data);
-export const updatePhysicalInstitute = (id, data) => api.put('/api/academic/physical-institute/' + id, data);
-export const deletePhysicalInstitute = (id) => api.delete('/api/academic/physical-institute/' + id);
+// Fulfillment & Payment Requests (Admin)
+export const getCourseEnrollmentRequests = (params) => api.get('/api/enroll/requests/course', { params });
+export const getPackageEnrollmentRequests = (params) => api.get('/api/enroll/requests/package', { params });
+export const getLessonEnrollmentRequests = (params) => api.get('/api/enroll/requests/lesson', { params });
 
 // Tute Requests
-export const getTuteRequests = (params) => api.get('/api/academic/tute-requests/filter', { params });
-export const updateTuteRequest = (id, data) => api.put('/api/academic/tute-request/' + id, data);
-export const updateTuteRequestStatus = (id, status) => api.put('/api/academic/tute-request/' + id + '/status', { status });
-export const deleteTuteRequest = (id) => api.delete('/api/academic/tute-request/' + id);
-export const getTuteRequestsForPrint = (params) => api.get('/api/academic/tute-requests/print', { params });
+export const getTuteRequests = (params) => api.get('/api/tute-requests/filter', { params });
+export const updateTuteRequestStatus = (id, status) => api.patch(`/api/tute-request/${id}/status`, { status });
+export const deleteTuteRequest = (id) => api.delete(`/api/tute-request/${id}`);
+export const getTuteRequestsForPrint = (params) => api.get('/api/tute-requests/print', { params });
 
-// Enrollment Catalog & Filter
+// Payment Slips & Evidence
+export const uploadPaymentSlip = (formData) => api.post('/api/payment/evidence/upload', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+
+// Student Catalog Filters
 export const filterEnrollmentCourses = (params) => api.get('/api/student/courses/filter', { params });
 export const filterEnrollmentPackages = (params) => api.get('/api/student/packages/filter', { params });
 
@@ -198,9 +174,56 @@ export const getPackageEnrollmentProduct = (packageIdOrData, courseIds = []) => 
 };
 export const getLessonsForEnroll = (params) => api.get('/api/lessons/enroll', { params });
 
+// User Profile & Account (All roles)
+export const getOwnAccount = () => api.get('/api/user/me');
+export const updateOwnAccount = (data) => api.put('/api/user/me', data);
+export const deleteOwnAccount = (password) => api.delete('/api/user/profile/delete', { data: { password } });
+
+// Student Details & Management
+export const getStudentEssentialDetails = () => api.get('/api/user/student/essential-details');
+export const updateStudentEssentialDetails = (data) => api.put('/api/user/student/essential-details', data);
+export const updateStudentProfile = (data) => api.put('/api/user/student/profile', data);
+export const getStudents = (params) => api.get('/api/user/students/filter', { params });
+export const getStudentById = (userId) => api.get(`/api/user/student/${userId}`);
+export const impersonateStudent = (userId) => api.post(`/api/user/student/${userId}/impersonate`);
+export const deleteStudent = (userId) => api.delete(`/api/user/student/${userId}`);
+
+// Admin Staff Management (Super Admin)
+export const getAdmins = (params) => api.get('/api/user/admins/filter', { params });
+export const getAllAdmins = () => api.get('/api/user/admins/all');
+export const getAdminById = (userId) => api.get(`/api/user/admin/${userId}`);
+export const createAdmin = (data) => api.post('/api/user/admin', data);
+export const updateAdmin = (userId, data) => api.put(`/api/user/admin/${userId}`, data);
+export const deleteAdmin = (userId) => api.delete(`/api/user/admin/${userId}`);
+export const updateUserStatus = (userId, status) => api.put('/api/user/status', { userId, status });
+export const forceResetPassword = (userId, password) => api.patch(`/api/user/password/force-reset/${userId}`, { password });
+
+// Student Tags (Admin)
+export const getStudentTags = () => api.get('/api/user/student/tag');
+export const createStudentTag = (data) => api.post('/api/user/student/tag', data);
+export const updateStudentTag = (id, data) => api.put(`/api/user/student/tag/${id}`, data);
+export const deleteStudentTag = (id) => api.delete(`/api/user/student/tag/${id}`);
+export const getStudentTagsByStudentId = (studentId) => api.get(`/api/user/student/${studentId}/tags`);
+export const bulkSyncStudentTags = (assignments) => api.post('/api/user/student/tag/bulk-sync', { assignments });
+
+// Payment & Financial Configurations (Admin)
+export const getPaymentAmountConfigs = () => api.get('/api/payment/amount-configs/filter');
+export const createPaymentAmountConfig = (data) => api.post('/api/payment/amount-config', data);
+export const updatePaymentAmountConfig = (id, data) => api.put(`/api/payment/amount-config/${id}`, data);
+export const deletePaymentAmountConfig = (id) => api.delete(`/api/payment/amount-config/${id}`);
+
+export const getBankAccounts = (params) => api.get('/api/payment/bank-accounts/filter', { params });
+export const createBankAccount = (data) => api.post('/api/payment/bank-account', data);
+export const updateBankAccount = (id, data) => api.put(`/api/payment/bank-account/${id}`, data);
+export const deleteBankAccount = (id) => api.delete(`/api/payment/bank-account/${id}`);
+
+export const getRejectReasons = (params) => api.get('/api/payment/reject-reasons/filter', { params });
+export const createRejectReason = (data) => api.post('/api/payment/reject-reason', data);
+export const updateRejectReason = (id, data) => api.put(`/api/payment/reject-reason/${id}`, data);
+export const deleteRejectReason = (id) => api.delete(`/api/payment/reject-reason/${id}`);
+
 // Manual Enrollment (Admin)
 export const createManualEnrollment = (data) => api.post('/api/manual/enrollments', data);
-export const getStudents = (params) => api.get('/api/user/students/filter', { params });
 
 // Academic Modules (Admin)
 export const getModules = (params) => api.get('/api/academic/modules/filter', { params });
@@ -247,7 +270,6 @@ export const getStudentLessonWithResources = (id) => api.get(`/api/student/enrol
 
 // Student Live Meetings
 export const getStudentMeetings = () => api.get('/api/student/meetings');
-
 
 // Student History
 export const getStudentEnrollmentHistory = (params) => api.get('/api/student/history/enrollments', { params });
