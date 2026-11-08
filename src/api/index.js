@@ -94,18 +94,31 @@ export const getPackages = (params) => {
 
 export const getStudentPackages = (params) => api.get('/api/student/packages/filter', { params });
 export const getAdminPackages = (params) => api.get('/api/packages/filter', { params });
+export const getPackageById = (id) => api.get(`/api/academic/package/${id}`);
+export const createPackage = (data) => api.post('/api/academic/package', data);
+export const updatePackage = (data) => api.post('/api/academic/package/update', data);
+export const updatePackageStatus = (id, status) => api.put(`/api/academic/package/status/${id}`, { status });
+export const deletePackage = (id) => api.delete(`/api/academic/package/${id}`);
+export const getPackageCourses = (packageId) => api.get(`/api/package/${packageId}/courses`);
 
 // Lessons
+export const getLessons = (params) => api.get('/api/lessons/enroll', { params });
 export const getCourseLessons = (courseId) => api.get(`/api/course/${courseId}/lessons/all`);
 export const getLessonById = (id) => api.get(`/api/lesson/${id}`);
 export const createLesson = (data) => api.post('/api/aca/lesson', data);
 export const updateLesson = (id, data) => api.put(`/api/aca/lesson/${id}`, data);
 export const updateLessonStatus = (id, status) => api.put('/api/lesson/status', { id, status });
+export const reorderLessons = (courseId, lessons) => api.put(`/api/course/${courseId}/lessons/reorder`, { lessons });
 export const deleteLesson = (id) => api.delete(`/api/lesson/${id}`);
 
 // Lesson Resources
 export const getLessonResources = (lessonId) => api.get(`/api/lesson/${lessonId}/resources`);
 export const createLessonResource = (data) => api.post('/api/lesson/resource', data);
+export const addLessonResources = (formData) => api.post('/api/lesson/resources', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const updateLessonResource = (data) => api.put('/api/lesson/resource', data);
+export const reorderLessonResources = (lessonId, resources) => api.put(`/api/lesson/${lessonId}/resources/reorder`, { resources });
 export const deleteLessonResource = (id) => api.delete(`/api/lesson/resource/${id}`);
 
 // Physical Institutes
@@ -126,6 +139,7 @@ export const enrollCourseFree = (data) => api.post('/api/enroll/course/free', da
 export const enrollPackage = (data) => api.post('/api/enroll/package', data);
 export const enrollLesson = (data) => api.post('/api/enroll/lesson', data);
 export const cancelEnrollment = (data) => api.post('/api/enroll/cancel', data);
+export const removeEnrollment = (data) => api.patch('/api/enrollment/remove', data);
 
 export const updateCourseEnrollment = (data) => api.put('/api/enroll/update/course', data);
 export const updatePackageEnrollment = (data) => api.put('/api/enroll/update/package', data);
@@ -134,18 +148,24 @@ export const updateLessonEnrollment = (data) => api.put('/api/enroll/update/less
 // Enrollment Approval & Rejection (Admin)
 export const approveEnrollment = (orderId, data) => api.put(`/api/payment/${orderId}/approve`, data);
 export const rejectEnrollment = (orderId, data) => api.put(`/api/payment/${orderId}/reject`, data);
+export const approvePayment = (orderId, data) => api.put(`/api/payment/${orderId}/approve`, data);
+export const rejectPayment = (orderId, rejectReason) => api.put(`/api/payment/${orderId}/reject`, typeof rejectReason === 'string' ? { rejectReason } : rejectReason);
 export const deleteEnrollmentOrder = (orderId) => api.delete(`/api/enrollment/${orderId}`);
 
 // Fulfillment & Payment Requests (Admin)
 export const getCourseEnrollmentRequests = (params) => api.get('/api/enroll/requests/course', { params });
 export const getPackageEnrollmentRequests = (params) => api.get('/api/enroll/requests/package', { params });
 export const getLessonEnrollmentRequests = (params) => api.get('/api/enroll/requests/lesson', { params });
+export const getCourseRequests = (params) => api.get('/api/enroll/requests/course', { params });
+export const getPackageRequests = (params) => api.get('/api/enroll/requests/package', { params });
+export const getLessonRequests = (params) => api.get('/api/enroll/requests/lesson', { params });
 
 // Tute Requests
-export const getTuteRequests = (params) => api.get('/api/tute-requests/filter', { params });
-export const updateTuteRequestStatus = (id, status) => api.patch(`/api/tute-request/${id}/status`, { status });
-export const deleteTuteRequest = (id) => api.delete(`/api/tute-request/${id}`);
-export const getTuteRequestsForPrint = (params) => api.get('/api/tute-requests/print', { params });
+export const getTuteRequests = (params) => api.get('/api/academic/tute-requests/filter', { params });
+export const updateTuteRequestStatus = (id, status) => api.put(`/api/academic/tute-request/${id}/status`, { status });
+export const updateTuteRequest = (id, data) => api.put(`/api/academic/tute-request/${id}/status`, { status: data.status });
+export const deleteTuteRequest = (id) => api.delete(`/api/academic/tute-request/${id}`);
+export const getTuteRequestsForPrint = (params) => api.get('/api/academic/tute-requests/print', { params });
 
 // Payment Slips & Evidence
 export const uploadPaymentSlip = (formData) => api.post('/api/payment/evidence/upload', formData, {
