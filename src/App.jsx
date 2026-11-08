@@ -30,6 +30,12 @@ import LessonWithResourcesPage from "./pages/LessonWithResourcesPage";
 import MyMeetingsPage from "./pages/MyMeetingsPage";
 import CourseStudentsPage from "./pages/CourseStudentsPage";
 import HistoryPage from "./pages/HistoryPage";
+import ProfilePage from "./pages/ProfilePage";
+import StudentsPage from "./pages/StudentsPage";
+import BatchesPage from "./pages/BatchesPage";
+import StudentTagsPage from "./pages/StudentTagsPage";
+import AdminsPage from "./pages/AdminsPage";
+import PaymentConfigsPage from "./pages/PaymentConfigsPage";
 
 function App() {
   return (
@@ -59,6 +65,7 @@ function App() {
             }
           >
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/catalog" element={<EnrollmentCatalogPage />} />
             <Route path="/enrollment-catalog" element={<EnrollmentCatalogPage />} />
             <Route path="/courses" element={<CoursesPage />} />
@@ -134,6 +141,48 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* New Management Pages */}
+            <Route
+              path="/students"
+              element={
+                <ProtectedRoute adminOnly>
+                  <StudentsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/batches"
+              element={
+                <ProtectedRoute adminOnly>
+                  <BatchesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student-tags"
+              element={
+                <ProtectedRoute adminOnly>
+                  <StudentTagsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admins"
+              element={
+                <ProtectedRoute adminOnly>
+                  <AdminsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/payment-configs"
+              element={
+                <ProtectedRoute adminOnly>
+                  <PaymentConfigsPage />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="/payments/course" element={<CoursePaymentsPage />} />
             <Route path="/payments/package" element={<PackagePaymentsPage />} />
             <Route path="/payments/lesson" element={<ProtectedRoute adminOnly><LessonPaymentsPage /></ProtectedRoute>} />
