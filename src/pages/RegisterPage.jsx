@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { registerStudent, verifyRegisterOtp } from "../api";
 import toast from "react-hot-toast";
@@ -36,7 +36,7 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
 
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", ""]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -117,7 +117,7 @@ export default function RegisterPage() {
     const next = [...otp];
     next[idx] = val.slice(-1);
     setOtp(next);
-    if (val && idx < 5) {
+    if (val && idx < 3) {
       document.getElementById(`reg-otp-${idx + 1}`)?.focus();
     }
   };
@@ -130,15 +130,15 @@ export default function RegisterPage() {
 
   const handleOtpPaste = (e) => {
     e.preventDefault();
-    const pasteData = e.clipboardData.getData("text").trim().slice(0, 6);
+    const pasteData = e.clipboardData.getData("text").trim().slice(0, 4);
     if (!pasteData) return;
     const digits = pasteData.split("");
     const next = [...otp];
     digits.forEach((d, i) => {
-      if (i < 6) next[i] = d;
+      if (i < 4) next[i] = d;
     });
     setOtp(next);
-    const nextFocusIdx = Math.min(digits.length, 5);
+    const nextFocusIdx = Math.min(digits.length, 3);
     document.getElementById(`reg-otp-${nextFocusIdx}`)?.focus();
   };
 
@@ -146,7 +146,7 @@ export default function RegisterPage() {
     e.preventDefault();
     const otpStr = otp.join("");
     if (otpStr.length < 4) {
-      setError("Please enter the complete OTP code.");
+      setError("Please enter the complete 4-digit OTP code.");
       return;
     }
 
@@ -339,7 +339,7 @@ export default function RegisterPage() {
                   className="link-blue"
                   onClick={() => {
                     setStep("form");
-                    setOtp(["", "", "", "", "", ""]);
+                    setOtp(["", "", "", ""]);
                     setError("");
                   }}
                   style={{ cursor: "pointer" }}

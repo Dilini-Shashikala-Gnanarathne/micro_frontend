@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authLogin, authLoginVerifyOtp } from "../api";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [step, setStep] = useState("credentials"); // credentials | otp
   const [txnId, setTxnId] = useState("");
   const [form, setForm] = useState({ username: "", password: "" });
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", ""]);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,7 +52,7 @@ export default function LoginPage() {
     const next = [...otp];
     next[idx] = val.slice(-1);
     setOtp(next);
-    if (val && idx < 5) document.getElementById(`otp-${idx+1}`)?.focus();
+    if (val && idx < 3) document.getElementById(`otp-${idx+1}`)?.focus();
   };
 
   const handleOtpKey = (e, idx) => {
@@ -62,7 +62,7 @@ export default function LoginPage() {
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     const otpStr = otp.join("");
-    if (otpStr.length < 6) { setError("Please enter the 6-digit OTP."); return; }
+    if (otpStr.length < 4) { setError("Please enter the 4-digit OTP."); return; }
     setLoading(true); setError("");
     try {
       const res = await authLoginVerifyOtp(txnId, otpStr);
@@ -81,7 +81,7 @@ export default function LoginPage() {
         <p className="login-sub">
           {step === "credentials"
             ? "Sign in with your credentials to access your workspace."
-            : "Enter the 6-digit OTP sent to your registered mobile."}
+            : "Enter the 4-digit OTP sent to your registered mobile."}
         </p>
 
         {error && <div className="alert alert-danger" style={{textAlign:"left"}}>{error}</div>}
@@ -151,7 +151,7 @@ export default function LoginPage() {
               {loading ? <span className="spinner" /> : "Verify OTP"}
             </button>
             <p style={{textAlign:"center",marginTop:"14px",fontSize:"12.5px",color:"var(--text-muted)"}}>
-              Didnt receive OTP? <span className="link-blue" onClick={() => {setStep("credentials");setOtp(["","","","","",""]);setError("");}}>Go back</span>
+              Didnt receive OTP? <span className="link-blue" onClick={() => {setStep("credentials");setOtp(["","","",""]);setError("");}}>Go back</span>
             </p>
           </form>
         )}
