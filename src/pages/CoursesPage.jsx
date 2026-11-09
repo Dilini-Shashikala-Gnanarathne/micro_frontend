@@ -9,6 +9,7 @@ import {
   updateCourseStatus,
   deleteCourse,
   getBatches,
+  getAllModulesForAdmin,
 } from "../api";
 import toast from "react-hot-toast";
 
@@ -68,6 +69,7 @@ const INITIAL_FORM = {
   expiryDays: 30,
   expiryDate: "",
   imageUrl: "placeholder",
+  academicModuleIds: [],
 };
 
 export default function CoursesPage() {
@@ -77,6 +79,7 @@ export default function CoursesPage() {
   // Data states
   const [courses, setCourses] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [academicModules, setAcademicModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
@@ -90,6 +93,7 @@ export default function CoursesPage() {
     isFree: "",
     isFeatured: "",
     startDate: "",
+    academicModuleId: "",
     page: 1,
     size: 10,
     sortBy: "created_at",
@@ -126,13 +130,20 @@ export default function CoursesPage() {
   });
   const [quickSubmitting, setQuickSubmitting] = useState(false);
 
-  // Fetch batches for dropdown
+  // Fetch batches & academic modules for dropdown
   useEffect(() => {
     if (isAdmin) {
       getBatches()
         .then((res) => {
           const list = res.data?.data || res.data || [];
           setBatches(Array.isArray(list) ? list : []);
+        })
+        .catch(() => {});
+
+      getAllModulesForAdmin()
+        .then((res) => {
+          const list = res.data?.data || res.data || [];
+          setAcademicModules(Array.isArray(list) ? list : []);
         })
         .catch(() => {});
     }
@@ -184,6 +195,7 @@ export default function CoursesPage() {
       isFree: "",
       isFeatured: "",
       startDate: "",
+      academicModuleId: "",
       page: 1,
       size: 10,
       sortBy: "created_at",
@@ -236,6 +248,7 @@ export default function CoursesPage() {
         expiryDate: (c.expiry?.expiry_date || c.expiry?.expiryDate || c.expiry_date || c.expiryDate || "").split("T")[0] || "",
         imageUrl: c.image_url || c.imageUrl || "",
         parentIds: (c.parentCourses || c.parent_courses || []).map(p => typeof p === "object" ? (p.parent_id || p.id) : p).filter(Boolean),
+        academicModuleIds: (c.academicModules || []).map(m => m.id).filter(Boolean),
       });
       setImagePreview(c.image_url || c.imageUrl || null);
       setImageFile(null);
@@ -380,6 +393,7 @@ export default function CoursesPage() {
         imageUrl: formData.imageUrl || "placeholder",
         parentIds: formData.courseType === 'EXTRA_CLASS' ? (formData.parentIds || []) : [],
         physicalClassIds: [],
+        academicModuleIds: formData.academicModuleIds || [],
       };
 
       if (isEditMode) {
@@ -571,6 +585,19 @@ export default function CoursesPage() {
               <option value="">Pricing</option>
               <option value="1">Free Only</option>
               <option value="0">Paid Only</option>
+            </select>
+
+            {/* Academic Module filter */}
+            <select
+              className="form-control"
+              style={{ width: 160 }}
+              value={filters.academicModuleId}
+              onChange={(e) => handleFilterChange("academicModuleId", e.target.value)}
+            >
+              <option value="">All Modules</option>
+              {academicModules.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
             </select>
 
             {/* Reset Filter Button */}
@@ -1077,6 +1104,38 @@ export default function CoursesPage() {
                   )}
                 </div>
 
+                {/* Academic Modules (Optional) */}
+                <div className="form-group">
+                  <label className="form-label">Academic Modules (Optional)</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 120, overflowY: "auto", padding: 8, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)" }}>
+                    {academicModules.filter(m => m.isActive === 1 || m.isActive === true || (formData.academicModuleIds || []).includes(m.id)).map((m) => {
+                      const isChecked = (formData.academicModuleIds || []).includes(m.id);
+                      return (
+                        <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, background: isChecked ? "rgba(79, 70, 229, 0.1)" : "#fff", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setFormData(p => ({
+                                ...p,
+                                academicModuleIds: checked
+                                  ? [...(p.academicModuleIds || []), m.id]
+                                  : (p.academicModuleIds || []).filter(id => id !== m.id)
+                              }));
+                            }}
+                            disabled={submitting}
+                          />
+                          {m.name}
+                        </label>
+                      );
+                    })}
+                    {academicModules.length === 0 && (
+                      <span style={{ fontSize: 12, color: "var(--text-muted)" }}>No academic modules available.</span>
+                    )}
+                  </div>
+                </div>
+
                 {/* Description & Notes */}
                 <div className="form-group">
                   <label className="form-label">Description</label>
@@ -1172,6 +1231,11 @@ export default function CoursesPage() {
                 <div><strong>Parent Courses:</strong> {
                   (viewingCourse.parentCourses || viewingCourse.parent_courses || []).length > 0
                     ? (viewingCourse.parentCourses || viewingCourse.parent_courses).map(p => typeof p === "object" ? (p.parent_name || p.name || p.code || p.parent_id) : p).join(", ")
+                    : "None"
+                }</div>
+                <div><strong>Academic Modules:</strong> {
+                  (viewingCourse.academicModuleName || []).length > 0
+                    ? viewingCourse.academicModuleName.join(", ")
                     : "None"
                 }</div>
                 <div><strong>Meta Tags:</strong> {viewingCourse.meta_tags || viewingCourse.metaTags || "None"}</div>

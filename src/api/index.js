@@ -245,8 +245,10 @@ export const deleteRejectReason = (id) => api.delete(`/api/payment/reject-reason
 // Manual Enrollment (Admin)
 export const createManualEnrollment = (data) => api.post('/api/manual/enrollments', data);
 
-// Academic Modules (Admin)
+// Academic Modules
 export const getModules = (params) => api.get('/api/academic/modules/filter', { params });
+export const getActiveModules = () => api.get('/api/academic/modules/active');
+export const getAllModulesForAdmin = () => api.get('/api/academic/modules/all');
 export const createModule = (data) => api.post('/api/academic/module', data);
 export const updateModule = (id, data) => api.put(`/api/academic/module/${id}`, data);
 export const deleteModule = (id) => api.delete(`/api/academic/module/${id}`);

@@ -6,7 +6,8 @@ import {
   getBatches,
   removeEnrollment,
   getPackageEnrollmentProduct,
-  getLessonsForEnroll
+  getLessonsForEnroll,
+  getActiveModules
 } from "../api";
 import toast from "react-hot-toast";
 
@@ -17,8 +18,9 @@ export default function EnrollmentCatalogPage() {
   const [activeTab, setActiveTab] = useState("courses");
   const [loading, setLoading] = useState(false);
 
-  // Batches
+  // Batches & Academic Modules
   const [batches, setBatches] = useState([]);
+  const [activeModules, setActiveModules] = useState([]);
 
   // Course Filters
   const [courseFilters, setCourseFilters] = useState({
@@ -26,6 +28,7 @@ export default function EnrollmentCatalogPage() {
     course_type: "MONTHLY",
     medium: "all",
     batch_id: "",
+    academicModuleId: "",
   });
 
   // Package Filters
@@ -101,7 +104,7 @@ export default function EnrollmentCatalogPage() {
     }
   };
 
-  // Fetch batches on mount
+  // Fetch batches & active modules on mount
   useEffect(() => {
     getBatches()
       .then((res) => {
@@ -109,6 +112,13 @@ export default function EnrollmentCatalogPage() {
         setBatches(Array.isArray(list) ? list : []);
       })
       .catch((err) => console.error("Failed to load batches", err));
+
+    getActiveModules()
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setActiveModules(Array.isArray(list) ? list : []);
+      })
+      .catch((err) => console.error("Failed to load active modules", err));
   }, []);
 
   // Fetch Courses
@@ -120,6 +130,7 @@ export default function EnrollmentCatalogPage() {
       if (courseFilters.course_type) params.course_type = courseFilters.course_type;
       if (courseFilters.medium && courseFilters.medium !== "all") params.medium = courseFilters.medium;
       if (courseFilters.batch_id) params.batch_id = courseFilters.batch_id;
+      if (courseFilters.academicModuleId) params.academicModuleId = courseFilters.academicModuleId;
 
       const res = await filterEnrollmentCourses(params);
       const data = res.data?.data || res.data || [];
@@ -199,6 +210,7 @@ export default function EnrollmentCatalogPage() {
     courseFilters.course_type,
     courseFilters.medium,
     courseFilters.batch_id,
+    courseFilters.academicModuleId,
     packageFilters.medium,
     packageFilters.batch_id,
     lessonFilters.page,
@@ -393,6 +405,24 @@ export default function EnrollmentCatalogPage() {
               </select>
             </div>
 
+            {/* Academic Module Filter */}
+            <div style={{ flex: "0 1 200px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px", display: "block" }}>
+                Academic Module
+              </label>
+              <select
+                className="form-control"
+                value={courseFilters.academicModuleId}
+                onChange={(e) => setCourseFilters(f => ({ ...f, academicModuleId: e.target.value }))}
+                style={{ width: "100%" }}
+              >
+                <option value="">All Modules</option>
+                {activeModules.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Actions */}
             <div style={{ display: "flex", gap: "8px" }}>
               <button type="submit" className="btn btn-primary" style={{ padding: "9px 18px" }}>
@@ -403,7 +433,7 @@ export default function EnrollmentCatalogPage() {
                 className="btn btn-secondary"
                 style={{ padding: "9px 14px" }}
                 onClick={() => {
-                  setCourseFilters({ search: "", course_type: "MONTHLY", medium: "all", batch_id: "" });
+                  setCourseFilters({ search: "", course_type: "MONTHLY", medium: "all", batch_id: "", academicModuleId: "" });
                   fetchCourses();
                 }}
               >
