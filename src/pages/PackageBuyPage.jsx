@@ -170,8 +170,27 @@ export default function PackageBuyPage() {
 
 
   const selectedCombination = pkg?.combinations?.find((c) => c.id === selectedComboId);
-  const existingOrderId = enrollData?.orderId || enrollmentProduct?.orderId || enrollmentProduct?.enrollmentOrderId || enrollmentProduct?.enrollment_order_id;
-  const hasExistingEnrollment = Boolean(existingOrderId);
+
+  // Look for any existing pending/not_paid enrollment across the courses in this package or directly
+  const existingEnrollment =
+    enrollData?.enrollment ||
+    enrollmentProduct?.enrollment ||
+    enrollmentProduct?.courses?.find((c) => c?.enrollment?.status === "NOT_PAID" && c?.enrollment?.orderId)?.enrollment ||
+    enrollmentProduct?.courses?.find((c) => c?.enrollment?.orderId)?.enrollment;
+
+  const existingOrderId =
+    enrollData?.orderId ||
+    enrollmentProduct?.orderId ||
+    enrollmentProduct?.enrollmentOrderId ||
+    enrollmentProduct?.enrollment_order_id ||
+    existingEnrollment?.orderId ||
+    existingEnrollment?.order_id ||
+    null;
+
+  const hasExistingEnrollment = Boolean(
+    existingOrderId &&
+    (existingEnrollment?.status === "NOT_PAID" || !existingEnrollment?.status || existingEnrollment?.orderStatus === "PENDING_PAYMENT")
+  );
 
   // 1. STEP 1: ONLY CALL /api/enroll/package
 
@@ -220,9 +239,6 @@ export default function PackageBuyPage() {
 
     setEnrolling(true);
 
-    const existingOrderId = enrollData?.orderId || enrollmentProduct?.orderId || enrollmentProduct?.enrollmentOrderId || enrollmentProduct?.enrollment_order_id;
-    const hasExistingEnrollment = Boolean(existingOrderId);
-
     try {
       let res;
       let endpoint = "";
@@ -234,7 +250,7 @@ export default function PackageBuyPage() {
           orderId: existingOrderId,
           packageId: id,
           paymentMethod: paymentMethod,
-          courseIds: formattedCourses,
+          courses: formattedCourses,
         };
         console.log("PACKAGE UPDATE ENROLLMENT PAYLOAD:", payload);
         res = await updatePackageEnrollment(payload);
@@ -313,7 +329,7 @@ export default function PackageBuyPage() {
   };
 
   const handleUpdatePackageTest = async () => {
-    const orderId = enrollData?.orderId;
+    const orderId = enrollData?.orderId || existingOrderId;
     if (!orderId) {
       toast.error("No Order ID found to update.");
       return;
@@ -1016,6 +1032,29 @@ export default function PackageBuyPage() {
             </div>
           </div>
 
+          {hasExistingEnrollment && (
+            <div
+              style={{
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                borderRadius: "var(--radius-sm)",
+                padding: "12px 18px",
+                marginBottom: "16px",
+                color: "#1e40af",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <span style={{ fontSize: "18px" }}>ℹ️</span>
+              <div>
+                Existing enrollment found (Status: <strong>{existingEnrollment?.status || "NOT_PAID"}</strong>, Order ID: <strong>{existingOrderId}</strong>).
+                Clicking the button below will update your package enrollment via <code>PUT /api/enrollments/packages/{existingOrderId}</code>.
+              </div>
+            </div>
+          )}
+
           {/* Step 1 Action Bar */}
           <div className="card">
             <div className="card-body flex justify-between items-center" style={{ padding: "18px 24px" }}>
@@ -1045,8 +1084,8 @@ export default function PackageBuyPage() {
                   (enrollmentProduct?.is_free || Number(enrollmentProduct?.price) === 0)
                     ? `Claim Free Enrollment (Combo ${selectedCombination?.code || ""})`
                     : (hasExistingEnrollment
-                        ? `Update Package Enrollment (Combo ${selectedCombination?.code || ""})`
-                        : `Enroll in Combo ${selectedCombination?.code || ""}`)
+                      ? `Update Package Enrollment (Combo ${selectedCombination?.code || ""})`
+                      : `Enroll in Combo ${selectedCombination?.code || ""}`)
                 )}
               </button>
             </div>

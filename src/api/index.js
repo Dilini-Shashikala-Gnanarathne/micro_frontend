@@ -183,7 +183,7 @@ export const updateCourseEnrollment = (data) => {
   return api.put(`/api/enrollments/courses/${id}`, data);
 };
 export const updatePackageEnrollment = (data) => {
-  const id = data?.enrollmentId || data?.orderId || '';
+  const id = data?.orderId || '';
   return api.put(`/api/enrollments/packages/${id}`, data);
 };
 export const updateLessonEnrollment = (data) => api.put('/api/enroll/update/lesson', data);
@@ -225,7 +225,7 @@ export const uploadPaymentSlip = (orderIdOrFormData, maybeFormData) => {
         try {
           const parsed = JSON.parse(formData.get('data'));
           orderId = parsed.orderId || parsed.order_id || parsed.paymentId || '';
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   }
