@@ -155,6 +155,7 @@ export default function EnrollPage() {
   const [updateNeedHomeDelivery, setUpdateNeedHomeDelivery] = useState(true);
   const [updateDeliveryInstituteId, setUpdateDeliveryInstituteId] = useState("");
   const [updateSelectedLessonIds, setUpdateSelectedLessonIds] = useState([]);
+  const [updatePackageTuteOptions, setUpdatePackageTuteOptions] = useState({});
   const [updating, setUpdating] = useState(false);
   const [showUpdatePanel, setShowUpdatePanel] = useState(true);
   const [needTute, setNeedTute] = useState(false);
@@ -394,7 +395,7 @@ export default function EnrollPage() {
 
         if (hasExistingEnrollment) {
           // If class already has enrollment, set update endpoint
-          endpoint = "PUT /api/enroll/update/course";
+          endpoint = `PUT /api/enrollments/courses/${existingOrderId}`;
           payload = {
             orderId: existingOrderId,
             paymentMethod,
@@ -426,12 +427,27 @@ export default function EnrollPage() {
           }
         }
       } else if (enrollType === "package") {
-        endpoint = "POST /api/enroll/package";
-        payload = {
-          packageId: selected.packageId || selected.id,
-          paymentMethod,
-        };
-        res = await enrollPackage(payload);
+        const pkgId = selected.packageId || selected.id;
+        const existingOrderId = selected?.enrollment?.order_id || selected?.enrollment?.orderId || selected?.orderId;
+        const hasExistingEnrollment = Boolean(selected?.enrollment && existingOrderId);
+
+        if (hasExistingEnrollment) {
+          endpoint = `PUT /api/enrollments/packages/${existingOrderId}`;
+          payload = {
+            orderId: existingOrderId,
+            packageId: pkgId,
+            paymentMethod,
+            courses: selected?.courses || selected?.items || undefined,
+          };
+          res = await updatePackageEnrollment(payload);
+        } else {
+          endpoint = "POST /api/enroll/package";
+          payload = {
+            packageId: pkgId,
+            paymentMethod,
+          };
+          res = await enrollPackage(payload);
+        }
       } else if (enrollType === "lesson") {
         endpoint = "POST /api/enroll/lesson";
         payload = {
@@ -540,7 +556,7 @@ export default function EnrollPage() {
     try {
       let res;
       if (enrollType === "course") {
-        endpoint = "PUT /api/enroll/update/course";
+        endpoint = `PUT /api/enrollments/courses/${orderId}`;
         payload = {
           orderId,
           paymentMethod: updatePaymentMethod,
@@ -550,12 +566,25 @@ export default function EnrollPage() {
         };
         res = await updateCourseEnrollment(payload);
       } else if (enrollType === "package") {
-        endpoint = "PUT /api/enroll/update/package";
+        endpoint = `PUT /api/enrollments/packages/${orderId}`;
+        const pkgId = enrollResult?.packageId || selected?.packageId || selected?.id;
+        const enrolledCourses = enrollResult?.enrolledCourses || selected?.courses || selected?.items || [];
+        const formattedCourseItems = enrolledCourses.map((c) => {
+          const cId = c.courseId || c.id;
+          const opt = updatePackageTuteOptions[cId] || {};
+          return {
+            courseId: cId,
+            needTute: Boolean(opt.needTute),
+            needHomeDelivery: Boolean(opt.needHomeDelivery ?? true),
+            deliveryInstituteId: opt.needTute && !opt.needHomeDelivery ? (opt.deliveryInstituteId || null) : null,
+          };
+        });
+
         payload = {
           orderId,
+          packageId: pkgId,
           paymentMethod: updatePaymentMethod,
-          packageCombinationId: selected?.packageCombinationId || selected?.id,
-          items: [],
+          courses: formattedCourseItems.length > 0 ? formattedCourseItems : undefined,
         };
         res = await updatePackageEnrollment(payload);
       } else if (enrollType === "lesson") {
@@ -806,7 +835,7 @@ export default function EnrollPage() {
                 <span>Enrolling in: <strong>{selected?.name || `${selectedLessons.length} lesson(s)`}</strong></span>
                 {enrollType === "course" && selected?.enrollment?.order_id && (
                   <div style={{ marginTop: "6px", fontSize: "12px", color: "#1e3a8a", fontWeight: 600 }}>
-                    ℹ️ Existing enrollment found (Status: {selected?.enrollment?.status || "NOT_PAID"}, Order: {selected.enrollment.order_id}). Clicking proceed will update your enrollment via <code>PUT /api/enroll/update/course</code>.
+                    ℹ️ Existing enrollment found (Status: {selected?.enrollment?.status || "NOT_PAID"}, Order: {selected.enrollment.order_id}). Clicking proceed will update your enrollment via <code>PUT /api/enrollments/courses/{selected.enrollment.order_id}</code>.
                   </div>
                 )}
               </div>
@@ -990,6 +1019,8 @@ export default function EnrollPage() {
                     <span className="spinner" />
                   ) : (enrollType === "course" && selected?.enrollment?.order_id) ? (
                     "Update Course Enrollment →"
+                  ) : (enrollType === "package" && (selected?.enrollment?.order_id || selected?.enrollment?.orderId || selected?.orderId)) ? (
+                    "Update Package Enrollment →"
                   ) : (enrollType === "course" && selected && (
                     (selected.reason && ["TYPE_FREE", "PRICE_ZERO", "EXTRA_PARENT", "EXTRA_PARENT_ENROLLMENT", "FREE_CARD"].includes(selected.reason)) ||
                     Boolean(selected.isFree || selected.is_free || Number(selected.croppedPrice ?? selected.originalPrice ?? 1) === 0)
@@ -1132,7 +1163,7 @@ export default function EnrollPage() {
                         🔄 Test Strategy Pattern: Update Enrollment
                       </h4>
                       <div style={{ fontSize: "12px", color: "#475569", marginTop: "2px" }}>
-                        Tests: <code style={{ color: "#2563eb", fontWeight: 700 }}>PUT /api/enroll/update/{enrollType}</code>
+                        Tests: <code style={{ color: "#2563eb", fontWeight: 700 }}>PUT {enrollType === 'course' ? `/api/enrollments/courses/${enrollResult.orderId}` : (enrollType === 'package' ? `/api/enrollments/packages/${enrollResult.orderId}` : '/api/enroll/update/lesson')}</code>
                       </div>
                     </div>
                     <span className="badge badge-primary">
@@ -1217,6 +1248,94 @@ export default function EnrollPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Package specific options: Tute & Delivery Options per Course */}
+                  {enrollType === "package" && (
+                    <div style={{ marginBottom: "14px" }}>
+                      <label className="form-label" style={{ fontSize: "12.5px", fontWeight: 700 }}>
+                        Package Courses & Tute Request Preferences:
+                      </label>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+                        {(enrollResult?.enrolledCourses || selected?.courses || selected?.items || []).map((c) => {
+                          const cId = c.courseId || c.id;
+                          const cName = c.courseName || c.name || c.courseCode || cId;
+                          const opt = updatePackageTuteOptions[cId] || { needTute: false, needHomeDelivery: true, deliveryInstituteId: "" };
+                          return (
+                            <div
+                              key={cId}
+                              style={{
+                                border: "1px solid #cbd5e1",
+                                borderRadius: "6px",
+                                padding: "8px 12px",
+                                background: "white",
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                <span style={{ fontWeight: 600, fontSize: "13px" }}>{cName}</span>
+                                <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", margin: 0 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(opt.needTute)}
+                                    onChange={(e) => {
+                                      setUpdatePackageTuteOptions({
+                                        ...updatePackageTuteOptions,
+                                        [cId]: { ...opt, needTute: e.target.checked }
+                                      });
+                                    }}
+                                  />
+                                  Request Tute
+                                </label>
+                              </div>
+                              {opt.needTute && (
+                                <div style={{ display: "flex", gap: "12px", marginTop: "6px", alignItems: "center", flexWrap: "wrap", paddingTop: "6px", borderTop: "1px dashed #e2e8f0" }}>
+                                  <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "4px", margin: 0 }}>
+                                    <input
+                                      type="radio"
+                                      name={`pkg-update-del-${cId}`}
+                                      checked={Boolean(opt.needHomeDelivery)}
+                                      onChange={() => setUpdatePackageTuteOptions({
+                                        ...updatePackageTuteOptions,
+                                        [cId]: { ...opt, needHomeDelivery: true }
+                                      })}
+                                    />
+                                    Home Delivery
+                                  </label>
+                                  <label style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "4px", margin: 0 }}>
+                                    <input
+                                      type="radio"
+                                      name={`pkg-update-del-${cId}`}
+                                      checked={!opt.needHomeDelivery}
+                                      onChange={() => setUpdatePackageTuteOptions({
+                                        ...updatePackageTuteOptions,
+                                        [cId]: { ...opt, needHomeDelivery: false }
+                                      })}
+                                    />
+                                    Institute Pickup
+                                  </label>
+                                  {!opt.needHomeDelivery && (
+                                    <select
+                                      className="form-control"
+                                      value={opt.deliveryInstituteId || ""}
+                                      onChange={(e) => setUpdatePackageTuteOptions({
+                                        ...updatePackageTuteOptions,
+                                        [cId]: { ...opt, deliveryInstituteId: e.target.value }
+                                      })}
+                                      style={{ fontSize: "12px", maxWidth: "200px" }}
+                                    >
+                                      <option value="">Select Pickup Institute</option>
+                                      {institutes.map((inst) => (
+                                        <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Lesson specific options: Select different lessons */}
                   {enrollType === "lesson" && items.length > 0 && (

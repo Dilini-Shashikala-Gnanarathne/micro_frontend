@@ -4,6 +4,7 @@ import {
   getPackageById,
   getPackageEnrollmentProduct,
   enrollPackage,
+  updatePackageEnrollment,
   uploadPaymentSlip,
   cancelEnrollment,
   getPhysicalInstitutes
@@ -43,6 +44,7 @@ export default function PackageBuyPage() {
   const [lastApiCall, setLastApiCall] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [cancelMessage, setCancelMessage] = useState("");
+  const [updatingPackage, setUpdatingPackage] = useState(false);
 
   // Tute & Material State
   const [institutes, setInstitutes] = useState([]);
@@ -168,6 +170,8 @@ export default function PackageBuyPage() {
 
 
   const selectedCombination = pkg?.combinations?.find((c) => c.id === selectedComboId);
+  const existingOrderId = enrollData?.orderId || enrollmentProduct?.orderId || enrollmentProduct?.enrollmentOrderId || enrollmentProduct?.enrollment_order_id;
+  const hasExistingEnrollment = Boolean(existingOrderId);
 
   // 1. STEP 1: ONLY CALL /api/enroll/package
 
@@ -216,31 +220,49 @@ export default function PackageBuyPage() {
 
     setEnrolling(true);
 
+    const existingOrderId = enrollData?.orderId || enrollmentProduct?.orderId || enrollmentProduct?.enrollmentOrderId || enrollmentProduct?.enrollment_order_id;
+    const hasExistingEnrollment = Boolean(existingOrderId);
+
     try {
-      const payload = {
-        packageId: id,
-        paymentMethod: paymentMethod,
-        courses: formattedCourses,
-      };
+      let res;
+      let endpoint = "";
+      let payload = {};
 
-      console.log("ENROLLMENT REQUEST PAYLOAD:", payload);
-
-      const res = await enrollPackage(payload);
+      if (hasExistingEnrollment) {
+        endpoint = `PUT /api/enrollments/packages/${existingOrderId}`;
+        payload = {
+          orderId: existingOrderId,
+          packageId: id,
+          paymentMethod: paymentMethod,
+          courseIds: formattedCourses,
+        };
+        console.log("PACKAGE UPDATE ENROLLMENT PAYLOAD:", payload);
+        res = await updatePackageEnrollment(payload);
+      } else {
+        endpoint = "POST /api/enroll/package";
+        payload = {
+          packageId: id,
+          paymentMethod: paymentMethod,
+          courses: formattedCourses,
+        };
+        console.log("PACKAGE ENROLLMENT REQUEST PAYLOAD:", payload);
+        res = await enrollPackage(payload);
+      }
 
       const data = res.data?.data || res.data;
 
       setEnrollData(data);
 
       setLastApiCall({
-        endpoint: "POST /api/enroll/package",
-        status: res.status || 201,
+        endpoint,
+        status: res.status || (hasExistingEnrollment ? 200 : 201),
         requestPayload: payload,
         responsePayload: res.data,
         timestamp: new Date().toLocaleTimeString(),
       });
 
       toast.success(
-        res.data?.message || "Package enrollment created successfully!"
+        res.data?.message || (hasExistingEnrollment ? "Package enrollment updated successfully!" : "Package enrollment created successfully!")
       );
 
       const isFree = Boolean(
@@ -287,6 +309,63 @@ export default function PackageBuyPage() {
       toast.error(err.response?.data?.message || "Failed to cancel package enrollment");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleUpdatePackageTest = async () => {
+    const orderId = enrollData?.orderId;
+    if (!orderId) {
+      toast.error("No Order ID found to update.");
+      return;
+    }
+
+    setUpdatingPackage(true);
+    const endpoint = `PUT /api/enrollments/packages/${orderId}`;
+    let payload = {};
+
+    try {
+      const formattedCourses = [];
+      if (selectedCombination?.items) {
+        for (const item of selectedCombination.items) {
+          const courseId = item.courseId;
+          const opt = courseTuteOptions[courseId] || { needTute: false, needHomeDelivery: true, deliveryInstituteId: "" };
+          formattedCourses.push({
+            courseId,
+            needTute: Boolean(opt.needTute),
+            needHomeDelivery: Boolean(opt.needHomeDelivery),
+            deliveryInstituteId: opt.needTute && !opt.needHomeDelivery ? (opt.deliveryInstituteId || null) : null,
+          });
+        }
+      }
+
+      payload = {
+        orderId,
+        packageId: id,
+        paymentMethod: paymentMethod,
+        courses: formattedCourses.length > 0 ? formattedCourses : undefined,
+      };
+
+      const res = await updatePackageEnrollment(payload);
+      toast.success(res.data?.message || "Package enrollment updated successfully!");
+      setLastApiCall({
+        endpoint,
+        status: res.status || 200,
+        requestPayload: payload,
+        responsePayload: res.data,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || "Failed to update package enrollment";
+      toast.error(errorMsg);
+      setLastApiCall({
+        endpoint,
+        status: err.response?.status || 400,
+        requestPayload: payload,
+        responsePayload: err.response?.data || { error: errorMsg },
+        timestamp: new Date().toLocaleTimeString(),
+      });
+    } finally {
+      setUpdatingPackage(false);
     }
   };
 
@@ -965,7 +1044,9 @@ export default function PackageBuyPage() {
                 ) : (
                   (enrollmentProduct?.is_free || Number(enrollmentProduct?.price) === 0)
                     ? `Claim Free Enrollment (Combo ${selectedCombination?.code || ""})`
-                    : `Enroll in Combo ${selectedCombination?.code || ""}`
+                    : (hasExistingEnrollment
+                        ? `Update Package Enrollment (Combo ${selectedCombination?.code || ""})`
+                        : `Enroll in Combo ${selectedCombination?.code || ""}`)
                 )}
               </button>
             </div>
@@ -1227,14 +1308,25 @@ export default function PackageBuyPage() {
             {/* Action Buttons */}
             <div className="flex justify-center gap-3 flex-wrap">
               {enrollData?.orderId && !cancelMessage && (
-                <button
-                  className="btn btn-danger"
-                  onClick={handleCancelPackageTest}
-                  disabled={cancelling}
-                  id="btn-test-cancel-package-enroll"
-                >
-                  {cancelling ? <span className="spinner" /> : "Test Cancel Endpoint (POST /api/enroll/cancel)"}
-                </button>
+                <>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleUpdatePackageTest}
+                    disabled={updatingPackage}
+                    id="btn-test-update-package-enroll"
+                    style={{ background: "#2563eb", borderColor: "#2563eb" }}
+                  >
+                    {updatingPackage ? <span className="spinner" /> : "🚀 Test Update Strategy (PUT /api/enrollments/packages)"}
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={handleCancelPackageTest}
+                    disabled={cancelling}
+                    id="btn-test-cancel-package-enroll"
+                  >
+                    {cancelling ? <span className="spinner" /> : "Test Cancel Endpoint (POST /api/enroll/cancel)"}
+                  </button>
+                </>
               )}
 
               <button className="btn btn-secondary" onClick={() => navigate("/payments/package")}>

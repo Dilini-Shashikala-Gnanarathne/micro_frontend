@@ -68,7 +68,6 @@ const INITIAL_FORM = {
   expiryType: "NONE",
   expiryDays: 30,
   expiryDate: "",
-  imageUrl: "placeholder",
   academicModuleIds: [],
 };
 
@@ -138,14 +137,14 @@ export default function CoursesPage() {
           const list = res.data?.data || res.data || [];
           setBatches(Array.isArray(list) ? list : []);
         })
-        .catch(() => {});
+        .catch(() => { });
 
       getAllModulesForAdmin()
         .then((res) => {
           const list = res.data?.data || res.data || [];
           setAcademicModules(Array.isArray(list) ? list : []);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [isAdmin]);
 
@@ -246,11 +245,9 @@ export default function CoursesPage() {
         expiryType: c.expiry?.expiry_type || c.expiry?.expiryType || c.expiry_type || c.expiryType || "NONE",
         expiryDays: c.expiry?.expiry_days ?? c.expiry?.expiryDays ?? c.expiry_days ?? 30,
         expiryDate: (c.expiry?.expiry_date || c.expiry?.expiryDate || c.expiry_date || c.expiryDate || "").split("T")[0] || "",
-        imageUrl: c.image_url || c.imageUrl || "",
         parentIds: (c.parentCourses || c.parent_courses || []).map(p => typeof p === "object" ? (p.parent_id || p.id) : p).filter(Boolean),
         academicModuleIds: (c.academicModules || []).map(m => m.id).filter(Boolean),
       });
-      setImagePreview(c.image_url || c.imageUrl || null);
       setImageFile(null);
       setIsModalOpen(true);
     } catch (err) {
@@ -390,18 +387,27 @@ export default function CoursesPage() {
         expiryType: formData.expiryType,
         expiryDays: formData.expiryType === "RELATIVE" ? Number(formData.expiryDays) : null,
         expiryDate: formData.expiryType === "FIXED" ? formData.expiryDate : null,
-        imageUrl: formData.imageUrl || "placeholder",
         parentIds: formData.courseType === 'EXTRA_CLASS' ? (formData.parentIds || []) : [],
         physicalClassIds: [],
         academicModuleIds: formData.academicModuleIds || [],
       };
 
       if (isEditMode) {
-        // Update Course (PUT /api/aca/course)
-        await updateCourse({
-          id: editingId,
-          ...payloadData,
-        });
+        // Update Course (POST /api/aca/course/update)
+        if (imageFile) {
+          const multiData = new FormData();
+          multiData.append("data", JSON.stringify({
+            id: editingId,
+            ...payloadData,
+          }));
+          multiData.append("image", imageFile);
+          await updateCourse(multiData);
+        } else {
+          await updateCourse({
+            id: editingId,
+            ...payloadData,
+          });
+        }
         toast.success("Course updated successfully!");
       } else {
         // Create Course (POST /api/aca/course with multipart)
