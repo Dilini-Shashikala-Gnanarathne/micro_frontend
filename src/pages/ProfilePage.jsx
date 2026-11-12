@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { getOwnAccount, updateOwnAccount, updateStudentProfile, getBatches } from "../api";
+import { getOwnAccount, updateOwnAccount, updateStudentProfile, getBatches, getPhysicalInstitutes } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function ProfilePage() {
@@ -10,6 +10,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [batches, setBatches] = useState([]);
+  const [institutes, setInstitutes] = useState([]);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -20,19 +21,23 @@ export default function ProfilePage() {
     gender: "MALE",
     medium: "SINHALA",
     whatsappNumber: "",
+    profileUrl: "",
     school: "",
     guardianName: "",
     guardianMobile: "",
     guardianType: "FATHER",
+    dob: "2000-01-01",
+    enrollDate: "",
     batchId: "",
+    instituteId: "",
     // Home Address
     homeAddressLine1: "",
     homeAddressLine2: "",
-    homeCityId: "",
+    homeCityId: 1,
     // Delivery Address
     deliveryAddressLine1: "",
     deliveryAddressLine2: "",
-    deliveryCityId: "",
+    deliveryCityId: 1,
   });
 
   useEffect(() => {
@@ -40,6 +45,12 @@ export default function ProfilePage() {
     if (isStudent) {
       getBatches()
         .then((res) => setBatches(res.data?.data || []))
+        .catch(() => {});
+      getPhysicalInstitutes()
+        .then((res) => {
+          const list = res.data?.data || res.data || [];
+          setInstitutes(Array.isArray(list) ? list : []);
+        })
         .catch(() => {});
     }
   }, []);
@@ -59,17 +70,21 @@ export default function ProfilePage() {
         gender: data.gender || "MALE",
         medium: data.medium || "SINHALA",
         whatsappNumber: data.whatsappNumber || data.whatsapp_number || "",
+        profileUrl: data.profileUrl || data.url || "",
         school: data.school || "",
         guardianName: data.guardianName || data.guardian_name || "",
         guardianMobile: data.guardianMobile || data.guardian_mobile || "",
         guardianType: data.guardianType || data.guardian_type || "FATHER",
+        dob: data.dob || "2000-01-01",
+        enrollDate: data.enrolledDate || data.enrollDate || data.enrolled_date || new Date().toISOString().split("T")[0],
         batchId: data.batchId || data.batch_id || "",
+        instituteId: data.instituteId || data.institute_id || "",
         homeAddressLine1: data.homeAddress?.line1 || data.homeAddressLine1 || "",
         homeAddressLine2: data.homeAddress?.line2 || data.homeAddressLine2 || "",
-        homeCityId: data.homeAddress?.cityId || data.homeCityId || "",
+        homeCityId: data.homeAddress?.cityId || data.homeCityId || 1,
         deliveryAddressLine1: data.deliveryAddress?.line1 || data.deliveryAddressLine1 || "",
         deliveryAddressLine2: data.deliveryAddress?.line2 || data.deliveryAddressLine2 || "",
-        deliveryCityId: data.deliveryAddress?.cityId || data.deliveryCityId || "",
+        deliveryCityId: data.deliveryAddress?.cityId || data.deliveryCityId || 1,
       });
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load profile details.");
@@ -100,22 +115,26 @@ export default function ProfilePage() {
       if (isStudent) {
         const payload = {
           id: user?.id,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          gender: formData.gender,
-          medium: formData.medium,
-          whatsappNumber: formData.whatsappNumber || null,
-          school: formData.school || null,
-          guardianName: formData.guardianName || null,
-          guardianMobile: formData.guardianMobile || null,
-          guardianType: formData.guardianType || null,
-          batchId: formData.batchId || null,
-          homeAddressLine1: formData.homeAddressLine1 || null,
-          homeAddressLine2: formData.homeAddressLine2 || null,
-          homeCityId: formData.homeCityId ? parseInt(formData.homeCityId) : null,
-          deliveryAddressLine1: formData.deliveryAddressLine1 || null,
-          deliveryAddressLine2: formData.deliveryAddressLine2 || null,
-          deliveryCityId: formData.deliveryCityId ? parseInt(formData.deliveryCityId) : null,
+          firstName: formData.firstName || "",
+          lastName: formData.lastName || "",
+          gender: formData.gender || "MALE",
+          whatsappNumber: formData.whatsappNumber || "",
+          profileUrl: formData.profileUrl || "",
+          homeAddressLine1: formData.homeAddressLine1 || "",
+          homeAddressLine2: formData.homeAddressLine2 || "",
+          homeCityId: parseInt(formData.homeCityId, 10) || 1,
+          deliveryAddressLine1: formData.deliveryAddressLine1 || "",
+          deliveryAddressLine2: formData.deliveryAddressLine2 || "",
+          deliveryCityId: parseInt(formData.deliveryCityId, 10) || 1,
+          school: formData.school || "",
+          guardianName: formData.guardianName || "",
+          guardianMobile: formData.guardianMobile || "",
+          guardianType: formData.guardianType || "FATHER",
+          medium: formData.medium || "SINHALA",
+          dob: formData.dob || "2000-01-01",
+          enrollDate: formData.enrollDate || new Date().toISOString().split("T")[0],
+          batchId: formData.batchId || "",
+          instituteId: formData.instituteId ? formData.instituteId : null,
         };
         await updateStudentProfile(payload);
       } else {
@@ -271,6 +290,16 @@ export default function ProfilePage() {
                   <option value="">Select Batch...</option>
                   {batches.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Physical Institute</label>
+                <select name="instituteId" value={formData.instituteId} onChange={handleChange} className="form-control">
+                  <option value="">No Physical Institute (Online Only)</option>
+                  {institutes.map((inst) => (
+                    <option key={inst.id} value={inst.id}>{inst.name}</option>
                   ))}
                 </select>
               </div>

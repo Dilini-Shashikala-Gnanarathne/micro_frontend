@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
-import { getStudents, getBatches, impersonateStudent, deleteStudent } from "../api";
+import { getStudents, getBatches, impersonateStudent, deleteStudent, updateStudentProfile, getPhysicalInstitutes } from "../api";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function StudentsPage() {
@@ -9,6 +9,7 @@ export default function StudentsPage() {
 
   const [students, setStudents] = useState([]);
   const [batches, setBatches] = useState([]);
+  const [institutes, setInstitutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -25,9 +26,19 @@ export default function StudentsPage() {
   // Selected student details modal
   const [selectedStudent, setSelectedStudent] = useState(null);
 
+  // Edit student modal (Admin-update)
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   useEffect(() => {
     getBatches()
       .then((res) => setBatches(res.data?.data || []))
+      .catch(() => {});
+    getPhysicalInstitutes()
+      .then((res) => {
+        const list = res.data?.data || res.data || [];
+        setInstitutes(Array.isArray(list) ? list : []);
+      })
       .catch(() => {});
   }, []);
 
@@ -96,6 +107,72 @@ export default function StudentsPage() {
       fetchStudents();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete student account.");
+    }
+  };
+
+  const handleOpenEdit = (student) => {
+    setEditingStudent({
+      id: student.id,
+      firstName: student.firstName || (student.name ? student.name.split(" ")[0] : "") || "",
+      lastName: student.lastName || (student.name ? student.name.split(" ").slice(1).join(" ") : "") || "",
+      gender: student.gender || "MALE",
+      whatsappNumber: student.whatsappNumber || "",
+      profileUrl: student.profileUrl || "",
+      homeAddressLine1: student.homeAddress?.line1 || "",
+      homeAddressLine2: student.homeAddress?.line2 || "",
+      homeCityId: student.homeAddress?.cityId || 1,
+      deliveryAddressLine1: student.deliveryAddress?.line1 || "",
+      deliveryAddressLine2: student.deliveryAddress?.line2 || "",
+      deliveryCityId: student.deliveryAddress?.cityId || 1,
+      school: student.school || "",
+      guardianName: student.guardianName || "",
+      guardianMobile: student.guardianMobile || "",
+      guardianType: student.guardianType || "FATHER",
+      medium: student.medium || "SINHALA",
+      dob: student.dob || "2000-01-01",
+      enrollDate: student.enrolledDate || student.enrollDate || new Date().toISOString().split("T")[0],
+      batchId: student.batchId || "",
+      instituteId: student.instituteId || "",
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    setSavingEdit(true);
+    try {
+      const payload = {
+        id: editingStudent.id,
+        firstName: editingStudent.firstName || "",
+        lastName: editingStudent.lastName || "",
+        gender: editingStudent.gender || "MALE",
+        whatsappNumber: editingStudent.whatsappNumber || "",
+        profileUrl: editingStudent.profileUrl || "",
+        homeAddressLine1: editingStudent.homeAddressLine1 || "",
+        homeAddressLine2: editingStudent.homeAddressLine2 || "",
+        homeCityId: parseInt(editingStudent.homeCityId, 10) || 1,
+        deliveryAddressLine1: editingStudent.deliveryAddressLine1 || "",
+        deliveryAddressLine2: editingStudent.deliveryAddressLine2 || "",
+        deliveryCityId: parseInt(editingStudent.deliveryCityId, 10) || 1,
+        school: editingStudent.school || "",
+        guardianName: editingStudent.guardianName || "",
+        guardianMobile: editingStudent.guardianMobile || "",
+        guardianType: editingStudent.guardianType || "FATHER",
+        medium: editingStudent.medium || "SINHALA",
+        dob: editingStudent.dob || "2000-01-01",
+        enrollDate: editingStudent.enrollDate || new Date().toISOString().split("T")[0],
+        batchId: editingStudent.batchId || "",
+        instituteId: editingStudent.instituteId ? editingStudent.instituteId : null,
+      };
+
+      await updateStudentProfile(payload);
+      toast.success("Student details updated successfully!");
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update student profile.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -247,6 +324,13 @@ export default function StudentsPage() {
                         >
                           View
                         </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenEdit(student)}
+                          title="Edit Student Profile & Institute"
+                        >
+                          Edit
+                        </button>
                         {isSuperAdmin && (
                           <button
                             className="btn btn-primary btn-sm"
@@ -321,6 +405,7 @@ export default function StudentsPage() {
                 <div><strong>School:</strong> {selectedStudent.school || "N/A"}</div>
                 <div><strong>Guardian:</strong> {selectedStudent.guardianName || "N/A"} ({selectedStudent.guardianType || "—"})</div>
                 <div><strong>Guardian Mobile:</strong> {selectedStudent.guardianMobile || "N/A"}</div>
+                <div><strong>Physical Institute:</strong> {selectedStudent.instituteName || "Online Only"}</div>
               </div>
 
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 12 }}>
@@ -344,6 +429,169 @@ export default function StudentsPage() {
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setSelectedStudent(null)}>Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Student Edit Modal (Admin-update via PUT /api/user/student/profile) */}
+      {editingStudent && (
+        <div className="modal-backdrop" onClick={() => !savingEdit && setEditingStudent(null)}>
+          <div className="modal-content" style={{ maxWidth: 700 }} onClick={(e) => e.stopPropagation()}>
+            <form onSubmit={handleSaveEdit}>
+              <div className="modal-header">
+                <h3 className="modal-title">Edit Student Profile: {editingStudent.firstName} {editingStudent.lastName}</h3>
+                <button type="button" className="modal-close" onClick={() => !savingEdit && setEditingStudent(null)}>×</button>
+              </div>
+              <div className="modal-body" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>First Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStudent.firstName}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, firstName: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Last Name *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStudent.lastName}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, lastName: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Academic Batch *</label>
+                    <select
+                      className="form-control"
+                      value={editingStudent.batchId}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, batchId: e.target.value })}
+                      required
+                    >
+                      <option value="">Select Batch...</option>
+                      {batches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Physical Institute</label>
+                    <select
+                      className="form-control"
+                      value={editingStudent.instituteId || ""}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, instituteId: e.target.value || null })}
+                    >
+                      <option value="">No Physical Institute (Online Only)</option>
+                      {institutes.map((inst) => (
+                        <option key={inst.id} value={inst.id}>{inst.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>WhatsApp Number *</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStudent.whatsappNumber}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, whatsappNumber: e.target.value })}
+                      placeholder="07xxxxxxxx"
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Medium *</label>
+                    <select
+                      className="form-control"
+                      value={editingStudent.medium}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, medium: e.target.value })}
+                    >
+                      <option value="SINHALA">Sinhala</option>
+                      <option value="ENGLISH">English</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Gender *</label>
+                    <select
+                      className="form-control"
+                      value={editingStudent.gender}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })}
+                    >
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>School</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStudent.school}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, school: e.target.value })}
+                      placeholder="Current School"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Guardian Name</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStudent.guardianName}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, guardianName: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Guardian Mobile</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={editingStudent.guardianMobile}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, guardianMobile: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 12 }}>Guardian Type</label>
+                    <select
+                      className="form-control"
+                      value={editingStudent.guardianType}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, guardianType: e.target.value })}
+                    >
+                      <option value="FATHER">Father</option>
+                      <option value="MOTHER">Mother</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={savingEdit}
+                  onClick={() => setEditingStudent(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={savingEdit}
+                >
+                  {savingEdit ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
