@@ -424,32 +424,7 @@ export default function AdminsPage() {
               <h3 className="modal-title">Force Reset Password</h3>
               <button className="modal-close" onClick={() => setResetModalAdmin(null)}>×</button>
             </div>
-            <form onSubmit={handleForceResetPassword}>
-              <div className="modal-body">
-                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 15 }}>
-                  Set a new password for <strong>{resetModalAdmin.firstName} {resetModalAdmin.lastName}</strong>.
-                </p>
-                <div className="form-group">
-                  <label className="form-label">New Password *</label>
-                  <input
-                    type="password"
-                    className="form-control"
-                    placeholder="Enter new password (min 8 chars)"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setResetModalAdmin(null)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={resetting}>
-                  {resetting ? "Resetting..." : "Reset Password"}
-                </button>
-              </div>
-            </form>
+            
           </div>
         </div>
       )}
